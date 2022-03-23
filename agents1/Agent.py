@@ -15,6 +15,7 @@ class Phase(enum.Enum):
 	FOLLOW_PATH_TO_CLOSED_DOOR=2,
 	OPEN_DOOR=3,
 	SEARCH_ROOM=4
+	DELIVER_BLOCK=5
 
 
 class Agent(BaseLineAgent):
@@ -31,6 +32,7 @@ class Agent(BaseLineAgent):
 		self._navigator = Navigator(agent_id=self.agent_id,
 									action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
 		self.collect_blocks = []
+		self.grabBlock = None
 
 	def filter_observations(self, state):
 		# find the Collect Blocks if not done yet
@@ -42,12 +44,14 @@ class Agent(BaseLineAgent):
 		self.blocksNearby = [item for item in state.values() if
 							 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
 		for block in self.blocksNearby:
-			print(self.isTargetBlock(block))
 			isTargetBlock = self.isTargetBlock(block)
 			if isTargetBlock >= 0:
 				# pick up block
 				self._sendMessage("Found " + self.collect_blocks[isTargetBlock]['obj_id'] + " in " + str(self._door['room_name']), state[self.agent_id]['obj_id'])
-				pass
+				self.grabBlock = block['obj_id']
+				break
+			else:
+				self.grabBlock = None
 			# self._sendMessage('Block in room_x: (' + str(block['visualization']['size']) + ', ' + str(block['visualization']['shape']) + ', ' + str(block['visualization']['colour']) + ')', state[self.agent_id]['obj_id'])
 		return state
 
@@ -102,14 +106,22 @@ class Agent(BaseLineAgent):
 				# self._sendMessage('Arrived at door', agent_name)
 				return OpenDoorAction.__name__, {'object_id':self._door['obj_id']}
 
+
+
 			if Phase.SEARCH_ROOM==self._phase:
 				# self._sendMessage('Entering door', agent_name)
 				self._state_tracker.update(state)
 				# Follow path to door
 				action = self._navigator.get_move_action(self._state_tracker)
+				if self.grabBlock is not None:
+					self._phase = Phase.DELIVER_BLOCK
+					return GrabObject.__name__, {'object_id': self.grabBlock}
 				if action!=None:
 					return action, {}
 				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
+
+			if Phase.DELIVER_BLOCK==self._phase:
+				pass
 
 	def isTargetBlock(self, block):
 		for i in range(len(self.collect_blocks)):
