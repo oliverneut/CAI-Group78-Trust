@@ -36,7 +36,6 @@ class Agent(BaseLineAgent):
         self._navigator = Navigator(agent_id=self.agent_id,
                                     action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
 
-
     def filter_observations(self, state):
         # find the Collect Blocks if not done yet
         if len(self.collect_blocks) is 0:
@@ -82,7 +81,8 @@ class Agent(BaseLineAgent):
                 if len(closedDoors) == 0:
                     return None, {}
                 # Randomly pick a closed door
-                self._door = random.choice(closedDoors)
+                # self._door = random.choice(closedDoors)
+                self._door = closedDoors[-1]
                 doorLoc = self._door['location']
                 # Location in front of door is south from door
                 doorLoc = doorLoc[0], doorLoc[1] + 1
@@ -120,30 +120,34 @@ class Agent(BaseLineAgent):
                 # Follow path to door
                 action = self._navigator.get_move_action(self._state_tracker)
                 if self.grabBlock is not None:
-                    self._phase = Phase.DELIVER_BLOCK
-                    goalblock = [block for block in self.state.values() if 'obj_id' in block and block['obj_id'] == self.grabBlock]
+                    goalblock = [block for block in self.state.values() if
+                                 'obj_id' in block and block['obj_id'] == self.grabBlock]
                     if len(goalblock) > 0:
                         goalblock = goalblock[0]
                         self.destination = self.collect_blocks[self.isTargetBlock(goalblock)]
-                        self._sendMessage('Picking up goal block ' + self.visualizeBlock(goalblock) + ' at ' + str(goalblock['location']), agent_name)
+                        self._sendMessage('Picking up goal block ' + self.visualizeBlock(goalblock) + ' at ' + str(
+                            goalblock['location']), agent_name)
                         self.carrying = goalblock
+                        self._navigator.reset_full()
+                        self._phase = Phase.DELIVER_BLOCK
                         return GrabObject.__name__, {'object_id': self.grabBlock}
                 if action != None:
                     return action, {}
                 self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.DELIVER_BLOCK == self._phase:
-                print("delivering block to " + str(self.destination['location']))
-                self._navigator.add_waypoints([self.destination['location']])
-
-                self._state_tracker.update(state)
                 # Follow path to drop off location
+                self._navigator.add_waypoints([self.destination['location']])
+                self._state_tracker.update(state)
                 action = self._navigator.get_move_action(self._state_tracker)
+
                 if action != None:
                     return action, {}
 
                 self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
-                self._sendMessage("Dropped goal block " + self.visualizeBlock(self.carrying) + " at drop location " + str(self.destination['location']), agent_name)
+                self._sendMessage(
+                    "Dropped goal block " + self.visualizeBlock(self.carrying) + " at drop location " + str(
+                        self.destination['location']), agent_name)
                 return DropObject.__name__, {'object_id': self.carrying['obj_id']}
 
     def isTargetBlock(self, block):
