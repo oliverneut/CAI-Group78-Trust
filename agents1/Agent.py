@@ -125,16 +125,15 @@ class Agent(BaseLineAgent):
                     if len(goalblock) > 0:
                         goalblock = goalblock[0]
                         self.destination = self.collect_blocks[self.isTargetBlock(goalblock)]
-                    self._sendMessage('Picking up goal block ' + self.visualizeBlock(goalblock) + ' at ' + str(goalblock['location']), agent_name)
-                    self.carrying = goalblock
-                    return GrabObject.__name__, {'object_id': self.grabBlock}
+                        self._sendMessage('Picking up goal block ' + self.visualizeBlock(goalblock) + ' at ' + str(goalblock['location']), agent_name)
+                        self.carrying = goalblock
+                        return GrabObject.__name__, {'object_id': self.grabBlock}
                 if action != None:
                     return action, {}
                 self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.DELIVER_BLOCK == self._phase:
                 print("delivering block to " + str(self.destination['location']))
-                self._sendMessage("delivering block to " + str(self.destination['location']), agent_name)
                 self._navigator.add_waypoints([self.destination['location']])
 
                 self._state_tracker.update(state)
@@ -144,6 +143,7 @@ class Agent(BaseLineAgent):
                     return action, {}
 
                 self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+                self._sendMessage("Dropped goal block " + self.visualizeBlock(self.carrying) + " at drop location " + str(self.destination['location']), agent_name)
                 return DropObject.__name__, {'object_id': self.carrying['obj_id']}
 
     def isTargetBlock(self, block):
