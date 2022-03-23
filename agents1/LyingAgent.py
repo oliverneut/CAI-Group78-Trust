@@ -38,8 +38,7 @@ class LyingAgent(BW4TBrain):
 
     def decide_on_bw4t_action(self, state: State):
         if len(self.collect_blocks) is 0:
-            for block in state['Collect_Block'], state['Collect_Block_1'], state['Collect_Block_2']:
-                self.collect_blocks.append([block['visualization']['shape'], block['visualization']['colour']])
+            self.collect_blocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
 
         print(self.collect_blocks)
         print(self.isTargetBlock(state['Collect_Block_1']))
@@ -101,7 +100,9 @@ class LyingAgent(BW4TBrain):
 
     def isTargetBlock(self, block):
         for i in range(len(self.collect_blocks)):
-            if block['visualization']['shape'] == self.collect_blocks[i][0] and block['visualization']['colour'] == self.collect_blocks[i][1]:
+            if block['visualization']['shape'] == self.collect_blocks[i]['visualization']['shape']\
+                    and block['visualization']['colour'] == self.collect_blocks[i]['visualization']['colour']\
+                    and block['visualization']['size'] == self.collect_blocks[i]['visualization']['size']:
                 return True
         return False
 
