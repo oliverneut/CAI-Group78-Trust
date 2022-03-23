@@ -29,10 +29,22 @@ class LyingAgent(BW4TBrain):
         self._navigator = Navigator(agent_id=self.agent_id,
                                     action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
 
+        self.collect_blocks = []
+
+
+
     def filter_bw4t_observations(self, state):
         return state
 
     def decide_on_bw4t_action(self, state: State):
+        if len(self.collect_blocks) is 0:
+            for block in state['Collect_Block'], state['Collect_Block_1'], state['Collect_Block_2']:
+                self.collect_blocks.append([block['visualization']['shape'], block['visualization']['colour']])
+
+        print(self.collect_blocks)
+        print(self.isTargetBlock(state['Collect_Block_1']))
+
+
         agent_name = state[self.agent_id]['obj_id']
         # Add team members
         for member in state['World']['team_members']:
@@ -85,6 +97,13 @@ class LyingAgent(BW4TBrain):
                 self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
                 # Open door
                 return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
+
+
+    def isTargetBlock(self, block):
+        for i in range(len(self.collect_blocks)):
+            if block['visualization']['shape'] == self.collect_blocks[i][0] and block['visualization']['colour'] == self.collect_blocks[i][1]:
+                return True
+        return False
 
     def _sendMessage(self, mssg, sender):
         '''
