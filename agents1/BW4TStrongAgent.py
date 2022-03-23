@@ -86,7 +86,7 @@ class StrongAgent(BaseLineAgent):
 				return OpenDoorAction.__name__, {'object_id':self._door['obj_id']}
 
 			if Phase.SEARCH_ROOM==self._phase:
-				self._sendMessage('Entering door', agent_name)
+				self._sendMessage('Searching through ' + self._door['room_name'],  agent_name)
 				self._state_tracker.update(state)
 				# Follow path to door
 				action = self._navigator.get_move_action(self._state_tracker)
