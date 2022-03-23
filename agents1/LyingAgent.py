@@ -33,17 +33,26 @@ class LyingAgent(BW4TBrain):
 
 
 
-    def filter_bw4t_observations(self, state):
-        return state
-
-    def decide_on_bw4t_action(self, state: State):
+    def filter_observations(self, state):
+        # find the Collect Blocks if not done yet
         if len(self.collect_blocks) is 0:
             self.collect_blocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
 
-        print(self.collect_blocks)
-        print(self.isTargetBlock(state['Collect_Block_1']))
+        # Check for blocks nearby that can be seen
+        self.blocksNearby = [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
+        for block in self.blocksNearby:
+            if self.isTargetBlock(block):
+                # pick up block
+                print("Found one of the Target Blocks!!")
+                pass
+            self._sendMessage('Block in room_x:', block['visualization']['colour'], state[self.agent_id]['obj_id'])
 
 
+        # print("blocks:", [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']])
+        # print()
+        return state
+
+    def decide_on_bw4t_action(self, state: State):
         agent_name = state[self.agent_id]['obj_id']
         # Add team members
         for member in state['World']['team_members']:
@@ -68,7 +77,7 @@ class LyingAgent(BW4TBrain):
                 # Location in front of door is south from door
                 doorLoc = doorLoc[0], doorLoc[1] + 1
                 # Send message of current action
-                if random.random() > 0.8: # Tell the truth
+                if random.random() > 0.8:   # Tell the truth
                     self._sendMessage('[TRUTH] Moving to door of ' + self._door['room_name'], agent_name)
                 else: # Lie
                     if len(closedDoors) > 1:
