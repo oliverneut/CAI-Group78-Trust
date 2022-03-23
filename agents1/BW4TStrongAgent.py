@@ -14,7 +14,9 @@ class Phase(enum.Enum):
 	PLAN_PATH_TO_CLOSED_DOOR=1,
 	FOLLOW_PATH_TO_CLOSED_DOOR=2,
 	OPEN_DOOR=3,
-	SEARCH_ROOM=4
+	SEARCH_ROOM=4,
+	DELIVER_BLOCK=5,
+	DROP_BLOCK=6
 
 
 class StrongAgent(BaseLineAgent):
@@ -23,6 +25,9 @@ class StrongAgent(BaseLineAgent):
 		super().__init__(settings)
 		self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 		self._teamMembers = []
+		self._goalBlocks = None
+		self._visibleBlocks = None
+		self._holdingBlock = None
 
 	def initialize(self):
 		super().initialize()
@@ -30,8 +35,12 @@ class StrongAgent(BaseLineAgent):
 		self._navigator = Navigator(agent_id=self.agent_id,
 									action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
 
-	def filter_bw4t_observations(self, state):
-		print("HELLOO")
+	def filter_observations(self, state) -> State:
+		if(self._goalBlocks == None):
+			self._goalBlocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
+
+		self._visibleBlocks = [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
+
 		return state
 
 	def decide_on_bw4t_action(self, state:State):
@@ -74,26 +83,54 @@ class StrongAgent(BaseLineAgent):
 				self._navigator.reset_full()
 				# search room phase
 				self._phase=Phase.SEARCH_ROOM
-				# make new waypoint to lower left corner of room
+				# make new waypoint to lower left and right corner of room
 				coordinate = self._door['location']
 				coordinate_1 = coordinate[0]-2, coordinate[1]-1
 				coordinate_2 = coordinate[0]+1, coordinate[1]-1
 				self._navigator.add_waypoints([coordinate_1, coordinate_2])
-				# make new waypoint to lower right corner of room
-				# self._navigator.add_waypoint([coordinate[0]+1, coordinate[1]-2])
+
 				# Open door
 				self._sendMessage('Arrived at door', agent_name)
-				return OpenDoorAction.__name__, {'object_id':self._door['obj_id']}
+				return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
 
 			if Phase.SEARCH_ROOM==self._phase:
 				self._sendMessage('Searching through ' + self._door['room_name'],  agent_name)
-				self._state_tracker.update(state)
 				# Follow path to door
+				foundBlock, vBlock, delivery_loc = self.takeBlock()
+				if foundBlock:
+					self._sendMessage('Found goal block shape',  agent_name)
+					self._phase=Phase.DELIVER_BLOCK
+					self._navigator.reset_full()
+					self._navigator.add_waypoint(delivery_loc)
+					self._holdingBlock = vBlock['obj_id']
+
+					return GrabObject, {'object_id': self._holdingBlock}
+
+				self._state_tracker.update(state)
 				action = self._navigator.get_move_action(self._state_tracker)
 				if action!=None:
 					return action, {}
 				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
 
+			if Phase.DELIVER_BLOCK==self._phase:
+				self._state_tracker.update(state)
+				# Follow path to door
+				action = self._navigator.get_move_action(self._state_tracker)
+				if action!=None:
+					return action, {}
+				self._phase=Phase.DROP_BLOCK
+			if Phase.DROP_BLOCK==self._phase:
+				DropObject, {'object_id': self._holdingBlock}
+
+
+	# returns true if it found a goalBlock and the specified obj_id
+	def takeBlock(self):
+		for vBlock in self._visibleBlocks:
+			for gBlock in self._goalBlocks:
+				if (vBlock['visualization']['shape'] == gBlock['visualization']['shape']
+						and vBlock['visualization']['colour'] == gBlock['visualization']['colour']):
+					return True, vBlock, gBlock['location']
+		return False, None, None
 
 
 	def _sendMessage(self, mssg, sender):
