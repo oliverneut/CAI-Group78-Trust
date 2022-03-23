@@ -24,14 +24,31 @@ class Agent(BaseLineAgent):
 		self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 		self._teamMembers = []
 
+
 	def initialize(self):
 		super().initialize()
 		self._state_tracker = StateTracker(agent_id=self.agent_id)
 		self._navigator = Navigator(agent_id=self.agent_id,
 									action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
+		self.collect_blocks = []
 
-	def filter_bw4t_observations(self, state):
-		print("HELLOO")
+	def filter_observations(self, state):
+		# find the Collect Blocks if not done yet
+		if len(self.collect_blocks) is 0:
+			self.collect_blocks = [item for item in state.values() if
+								   ('name' in item.keys() and item['name'] == 'Collect Block')]
+
+		# Check for blocks nearby that can be seen
+		self.blocksNearby = [item for item in state.values() if
+							 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
+		for block in self.blocksNearby:
+			print(self.isTargetBlock(block))
+			isTargetBlock = self.isTargetBlock(block)
+			if isTargetBlock >= 0:
+				# pick up block
+				self._sendMessage("Found " + self.collect_blocks[isTargetBlock]['obj_id'] + " in " + str(self._door['room_name']), state[self.agent_id]['obj_id'])
+				pass
+			# self._sendMessage('Block in room_x: (' + str(block['visualization']['size']) + ', ' + str(block['visualization']['shape']) + ', ' + str(block['visualization']['colour']) + ')', state[self.agent_id]['obj_id'])
 		return state
 
 	def decide_on_bw4t_action(self, state:State):
@@ -82,11 +99,11 @@ class Agent(BaseLineAgent):
 				# make new waypoint to lower right corner of room
 				# self._navigator.add_waypoint([coordinate[0]+1, coordinate[1]-2])
 				# Open door
-				self._sendMessage('Arrived at door', agent_name)
+				# self._sendMessage('Arrived at door', agent_name)
 				return OpenDoorAction.__name__, {'object_id':self._door['obj_id']}
 
 			if Phase.SEARCH_ROOM==self._phase:
-				self._sendMessage('Entering door', agent_name)
+				# self._sendMessage('Entering door', agent_name)
 				self._state_tracker.update(state)
 				# Follow path to door
 				action = self._navigator.get_move_action(self._state_tracker)
@@ -94,7 +111,13 @@ class Agent(BaseLineAgent):
 					return action, {}
 				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
 
-
+	def isTargetBlock(self, block):
+		for i in range(len(self.collect_blocks)):
+			if block['visualization']['shape'] == self.collect_blocks[i]['visualization']['shape'] \
+					and block['visualization']['colour'] == self.collect_blocks[i]['visualization']['colour'] \
+					and block['visualization']['size'] == self.collect_blocks[i]['visualization']['size']:
+				return i
+		return -1
 
 	def _sendMessage(self, mssg, sender):
 		'''
