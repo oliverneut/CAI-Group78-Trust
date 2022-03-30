@@ -29,9 +29,10 @@ class StrongAgent(BaseLineAgent):
 		self._goalBlocks = None
 		self._visibleBlocks = None
 		self._holdingBlock = None
-		self._orderCounter = 0
 		self._destination = None
-		self._goalBlockLocations = []
+		self._retrievedGBlocks = [0, 0, 0]
+		self._goalBlockIdx = -1
+
 
 	def initialize(self):
 		super().initialize()
@@ -44,6 +45,8 @@ class StrongAgent(BaseLineAgent):
 			self._goalBlocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
 			for g in self._goalBlocks:
 				print(g)
+
+
 
 		self._visibleBlocks = [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
 
@@ -62,7 +65,6 @@ class StrongAgent(BaseLineAgent):
 
 		while True:
 			if Phase.PLAN_PATH_TO_CLOSED_DOOR==self._phase:
-				print("Plan path to closed door phase")
 				self.planPathToClosedDoor(state)
 				self._phase=Phase.FOLLOW_PATH_TO_CLOSED_DOOR
 
@@ -91,9 +93,11 @@ class StrongAgent(BaseLineAgent):
 					self._phase=Phase.DROP_BLOCK
 
 			if Phase.DROP_BLOCK==self._phase:
+				self._retrievedGBlocks[self._goalBlockIdx] = 1
 				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
 				self._sendMessage('Dropped goal block ' + self.visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(self._destination), self._agentName)
 				return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+			# if
 
 	def deliverBlock(self, state):
 		self._state_tracker.update(state)
@@ -114,7 +118,7 @@ class StrongAgent(BaseLineAgent):
 			self._phase=Phase.DELIVER_BLOCK
 			self._navigator.reset_full()
 			self._destination = delivery_loc
-			self._navigator.add_waypoints([delivery_loc])
+			self._navigator.add_waypoints([self._destination])
 			self._holdingBlock = vBlock
 			return GrabObject.__name__, {'object_id': self._holdingBlock['obj_id']}
 
@@ -167,21 +171,19 @@ class StrongAgent(BaseLineAgent):
 
 	# returns true if it found a goalBlock and the specified obj_id
 	def takeBlock(self):
-		count = 0
-		for gBlock in self._goalBlocks:
-			gb = gBlock['visualization']
-			for vBlock in self._visibleBlocks:
-				vb = vBlock['visualization']
-				if (vb['shape'] == gb['shape']
-							and vb['colour'] == gb['colour']
-							and vb['size'] == gb['size']):
-					msg = 'Found goal block ' + self.visualize(vb) + ' at location ' + str(vBlock['location'])
-					self._sendMessage(msg, self._agentName)
-					if self._orderCounter == count:
-						print(count)
-						self._orderCounter += 1
+		for i in range(len(self._goalBlocks)):
+			gBlock = self._goalBlocks[i]
+			if self._retrievedGBlocks[i] != 1:
+				gb = gBlock['visualization']
+				for vBlock in self._visibleBlocks:
+					vb = vBlock['visualization']
+					if (vb['shape'] == gb['shape']
+								and vb['colour'] == gb['colour']
+								and vb['size'] == gb['size']):
+						msg = 'Found goal block ' + self.visualize(vb) + ' at location ' + str(vBlock['location'])
+						self._sendMessage(msg, self._agentName)
+						self._goalBlockIdx = i
 						return True, vBlock, gBlock['location']
-			count += 1
 		return False, None, None
 
 	def visualize(self, block):
