@@ -97,7 +97,6 @@ class StrongAgent(BaseLineAgent):
                     self._phase = Phase.DROP_BLOCK
 
             if Phase.DROP_BLOCK == self._phase:
-                self._retrievedGBlocks[self._goalBlockIdx.pop()] = 1
                 if sum(self._retrievedGBlocks) == 3:
                     self._phase = Phase.REORDER_BLOCKS
                 else:
@@ -109,13 +108,10 @@ class StrongAgent(BaseLineAgent):
                 self._sendMessage(
                     'Dropped goal block ' + self.visualize(block['visualization']) + ' at drop location ' + str(
                         self._destination), self._agentName)
+                self._goalBlockIdx.pop()
                 return DropObject.__name__, {'object_id': block['obj_id']}
 
-            if Phase.DELIVER_2ND_BLOCK:
-                print(len(self._holdingBlocks))
-                print(self._retrievedGBlocks)
-                print()
-
+            if Phase.DELIVER_2ND_BLOCK == self._phase:
                 self._navigator.reset_full()
 
                 for gb in self._goalBlocks:
@@ -176,7 +172,7 @@ class StrongAgent(BaseLineAgent):
             self._navigator.reset_full()
             self._holdingBlocks.append(vBlock)
 
-            if len(self._holdingBlocks) > 1 or sum(self._retrievedGBlocks) == 2: # If this is the second block, or last block deliver blocks
+            if len(self._holdingBlocks) > 1 or sum(self._retrievedGBlocks) >= 2: # If this is the second block, or last block deliver blocks
                 self._phase = Phase.DELIVER_BLOCK
                 self._navigator.add_waypoints([self._destination])
             else:
@@ -243,6 +239,7 @@ class StrongAgent(BaseLineAgent):
                         msg = 'Found goal block ' + self.visualize(vb) + ' at location ' + str(vBlock['location'])
                         self._sendMessage(msg, self._agentName)
                         self._goalBlockIdx.append(i)
+                        self._retrievedGBlocks[self._goalBlockIdx[-1]] = 1
                         return True, vBlock, gBlock['location']
         return False, None, None
 
