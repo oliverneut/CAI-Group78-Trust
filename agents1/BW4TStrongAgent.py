@@ -104,11 +104,9 @@ class StrongAgent(BaseLineAgent):
 
 			if Phase.REORDER_BLOCKS==self._phase:
 				self._navigator.reset_full()
-				self._navigator.add_waypoints([self._goalBlocks[0]['location']])
-				for gb in self._goalBlocks:
-					self._reorderActions.append((GrabObject.__name__, {'object_id': gb['obj_id']}))
-					self._reorderActions.append((DropObject.__name__, {'object_id': gb['obj_id']}))
-					self._reorderActions.append((MoveNorth.__name__, {}))
+				self._navigator.add_waypoints([self._goalBlocks[1]['location']])
+
+
 				self._phase = Phase.PICKDROP_BLOCKS
 
 			if Phase.PICKDROP_BLOCKS==self._phase:
@@ -117,8 +115,18 @@ class StrongAgent(BaseLineAgent):
 				if action!=None:
 					return action, {}
 				else:
+					self._reorderActions.append((MoveSouth.__name__, {}))
+					self._state_tracker.update(state)
+					for gb in self._goalBlocks:
+						for vb in self._visibleBlocks:
+							if self.visualize(vb['visualization']) == self.visualize(gb['visualization']):
+								self._reorderActions.append((GrabObject.__name__, {'object_id': vb['obj_id']}))
+								self._reorderActions.append((DropObject.__name__, {'object_id': vb['obj_id']}))
+								self._reorderActions.append((MoveNorth.__name__, {}))
+								break
+					self._reorderActions.pop()
+
 					if len(self._reorderActions) != 0:
-						print("Current action: ", self._reorderActions[0])
 						return self._reorderActions.pop(0)
 
 
