@@ -16,7 +16,9 @@ class Phase(enum.Enum):
 	OPEN_DOOR=3,
 	SEARCH_ROOM=4,
 	DELIVER_BLOCK=5,
-	DROP_BLOCK=6
+	DROP_BLOCK=6,
+	REORDER_BLOCKS=7,
+	PICKDROP_BLOCKS=8
 
 
 class StrongAgent(BaseLineAgent):
@@ -32,6 +34,7 @@ class StrongAgent(BaseLineAgent):
 		self._destination = None
 		self._retrievedGBlocks = [0, 0, 0]
 		self._goalBlockIdx = -1
+		self._reorderActions = []
 
 
 	def initialize(self):
@@ -45,8 +48,6 @@ class StrongAgent(BaseLineAgent):
 			self._goalBlocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
 			for g in self._goalBlocks:
 				print(g)
-
-
 
 		self._visibleBlocks = [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
 
@@ -94,10 +95,36 @@ class StrongAgent(BaseLineAgent):
 
 			if Phase.DROP_BLOCK==self._phase:
 				self._retrievedGBlocks[self._goalBlockIdx] = 1
-				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
+				if sum(self._retrievedGBlocks) == 3:
+					self._phase=Phase.REORDER_BLOCKS
+				else:
+					self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
 				self._sendMessage('Dropped goal block ' + self.visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(self._destination), self._agentName)
 				return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
-			# if
+
+			if Phase.REORDER_BLOCKS==self._phase:
+				self._navigator.reset_full()
+				self._navigator.add_waypoints([self._goalBlocks[0]['location']])
+				for gb in self._goalBlocks:
+					self._reorderActions.append((GrabObject.__name__, {'object_id': gb['obj_id']}))
+					self._reorderActions.append((DropObject.__name__, {'object_id': gb['obj_id']}))
+					self._reorderActions.append((MoveNorth.__name__, {}))
+				self._phase = Phase.PICKDROP_BLOCKS
+
+			if Phase.PICKDROP_BLOCKS==self._phase:
+				self._state_tracker.update(state)
+				action = self._navigator.get_move_action(self._state_tracker)
+				if action!=None:
+					return action, {}
+				else:
+					if len(self._reorderActions) != 0:
+						print("Current action: ", self._reorderActions[0])
+						return self._reorderActions.pop(0)
+
+
+
+
+
 
 	def deliverBlock(self, state):
 		self._state_tracker.update(state)
