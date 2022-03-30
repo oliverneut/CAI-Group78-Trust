@@ -21,7 +21,7 @@ class Phase(enum.Enum):
 	PICKDROP_BLOCKS=8
 
 
-class StrongAgent(BaseLineAgent):
+class Agent(BaseLineAgent):
 
 	def __init__(self, settings:Dict[str,object]):
 		super().__init__(settings)
