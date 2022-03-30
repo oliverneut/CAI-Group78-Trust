@@ -145,7 +145,7 @@ class StrongAgent(BaseLineAgent):
 
 
 	def searchRoom(self, state:State):
-		self._sendMessage('Searching through ' + self._door['room_name'],  state[self.agent_id]['obj_id'])
+		self._sendMessage('Searching through ' + self._door['room_name'], self._agentName)
 		# Follow path to door
 		foundBlock, vBlock, delivery_loc = self.takeBlock()
 		if foundBlock:
@@ -175,7 +175,7 @@ class StrongAgent(BaseLineAgent):
 		self._navigator.add_waypoints([coordinate_1, coordinate_2])
 
 		# Open door
-		self._sendMessage('Arrived at door', state[self.agent_id]['obj_id'])
+		self._sendMessage('Opening door of ' + self._door['room_name'], self._agentName)
 		return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
 
 	def followPathToClosedDoor(self, state:State):
@@ -199,7 +199,7 @@ class StrongAgent(BaseLineAgent):
 		# Location in front of door is south from door
 		doorLoc = doorLoc[0],doorLoc[1]+1
 		# Send message of current action
-		self._sendMessage('Moving to door of ' + self._door['room_name'], state[self.agent_id]['obj_id'])
+		self._sendMessage('Moving to ' + self._door['room_name'], self._agentName)
 		self._navigator.add_waypoints([doorLoc])
 
 
