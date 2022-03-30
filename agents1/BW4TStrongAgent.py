@@ -24,10 +24,14 @@ class StrongAgent(BaseLineAgent):
 	def __init__(self, settings:Dict[str,object]):
 		super().__init__(settings)
 		self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+		self._agentName = 0
 		self._teamMembers = []
 		self._goalBlocks = None
 		self._visibleBlocks = None
 		self._holdingBlock = None
+		self._orderCounter = 0
+		self._destination = None
+		self._goalBlockLocations = []
 
 	def initialize(self):
 		super().initialize()
@@ -38,16 +42,18 @@ class StrongAgent(BaseLineAgent):
 	def filter_observations(self, state) -> State:
 		if(self._goalBlocks == None):
 			self._goalBlocks = [item for item in state.values() if ('name' in item.keys() and item['name'] == 'Collect Block')]
+			for g in self._goalBlocks:
+				print(g)
 
 		self._visibleBlocks = [item for item in state.values() if 'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
 
 		return state
 
 	def decide_on_bw4t_action(self, state:State):
-		agent_name = state[self.agent_id]['obj_id']
+		self._agentName = state[self.agent_id]['obj_id']
 		# Add team members
 		for member in state['World']['team_members']:
-			if member!=agent_name and member not in self._teamMembers:
+			if member!=self._agentName and member not in self._teamMembers:
 				self._teamMembers.append(member)
 				# Process messages from team members
 		receivedMessages = self._processMessages(self._teamMembers)
@@ -56,82 +62,131 @@ class StrongAgent(BaseLineAgent):
 
 		while True:
 			if Phase.PLAN_PATH_TO_CLOSED_DOOR==self._phase:
-				self._navigator.reset_full()
-				closedDoors = [door for door in state.values()
-							   if 'class_inheritance' in door and 'Door' in door['class_inheritance'] and not door['is_open']]
-				if len(closedDoors)==0:
-					return None, {}
-				# Randomly pick a closed door
-				self._door = random.choice(closedDoors)
-				doorLoc = self._door['location']
-				# Location in front of door is south from door
-				doorLoc = doorLoc[0],doorLoc[1]+1
-				# Send message of current action
-				self._sendMessage('Moving to door of ' + self._door['room_name'], agent_name)
-				self._navigator.add_waypoints([doorLoc])
+				print("Plan path to closed door phase")
+				self.planPathToClosedDoor(state)
 				self._phase=Phase.FOLLOW_PATH_TO_CLOSED_DOOR
 
 			if Phase.FOLLOW_PATH_TO_CLOSED_DOOR==self._phase:
-				self._state_tracker.update(state)
-				# Follow path to door
-				action = self._navigator.get_move_action(self._state_tracker)
-				if action!=None:
-					return action, {}
-				self._phase=Phase.OPEN_DOOR
+				res = self.followPathToClosedDoor(state)
+				if res != -1:
+					return res
+				else:
+					self._phase=Phase.OPEN_DOOR
 
 			if Phase.OPEN_DOOR==self._phase:
-				self._navigator.reset_full()
-				# search room phase
-				self._phase=Phase.SEARCH_ROOM
-				# make new waypoint to lower left and right corner of room
-				coordinate = self._door['location']
-				coordinate_1 = coordinate[0]-2, coordinate[1]-1
-				coordinate_2 = coordinate[0]+1, coordinate[1]-1
-				self._navigator.add_waypoints([coordinate_1, coordinate_2])
-
-				# Open door
-				self._sendMessage('Arrived at door', agent_name)
-				return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
+				return self.openDoor(state)
 
 			if Phase.SEARCH_ROOM==self._phase:
-				self._sendMessage('Searching through ' + self._door['room_name'],  agent_name)
-				# Follow path to door
-				foundBlock, vBlock, delivery_loc = self.takeBlock()
-				if foundBlock:
-					self._sendMessage('Found goal block shape',  agent_name)
-					self._phase=Phase.DELIVER_BLOCK
-					self._navigator.reset_full()
-					self._navigator.add_waypoint(delivery_loc)
-					self._holdingBlock = vBlock['obj_id']
-
-					return GrabObject, {'object_id': self._holdingBlock}
-
-				self._state_tracker.update(state)
-				action = self._navigator.get_move_action(self._state_tracker)
-				if action!=None:
-					return action, {}
-				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
+				res = self.searchRoom(state)
+				if res != -1:
+					return res
+				else:
+					self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
 
 			if Phase.DELIVER_BLOCK==self._phase:
-				self._state_tracker.update(state)
-				# Follow path to door
-				action = self._navigator.get_move_action(self._state_tracker)
-				if action!=None:
-					return action, {}
-				self._phase=Phase.DROP_BLOCK
+				res = self.deliverBlock(state)
+				if res != -1:
+					return res
+				else:
+					self._phase=Phase.DROP_BLOCK
+
 			if Phase.DROP_BLOCK==self._phase:
-				DropObject, {'object_id': self._holdingBlock}
+				self._phase=Phase.PLAN_PATH_TO_CLOSED_DOOR
+				self._sendMessage('Dropped goal block ' + self.visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(self._destination), self._agentName)
+				return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+
+	def deliverBlock(self, state):
+		self._state_tracker.update(state)
+		# Follow path to door
+		action = self._navigator.get_move_action(self._state_tracker)
+		if action!=None:
+			return action, {}
+		else:
+			return -1
+
+
+	def searchRoom(self, state:State):
+		self._sendMessage('Searching through ' + self._door['room_name'],  state[self.agent_id]['obj_id'])
+		# Follow path to door
+		foundBlock, vBlock, delivery_loc = self.takeBlock()
+		if foundBlock:
+			self._sendMessage('Picking up goal block ' + self.visualize(vBlock['visualization']) + ' at ' + str(vBlock['location']),  self._agentName)
+			self._phase=Phase.DELIVER_BLOCK
+			self._navigator.reset_full()
+			self._destination = delivery_loc
+			self._navigator.add_waypoints([delivery_loc])
+			self._holdingBlock = vBlock
+			return GrabObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+
+		self._state_tracker.update(state)
+		action = self._navigator.get_move_action(self._state_tracker)
+		if action!=None:
+			return action, {}
+		else:
+			return -1
+
+	def openDoor(self, state:State):
+		self._navigator.reset_full()
+		# search room phase
+		self._phase=Phase.SEARCH_ROOM
+		# make new waypoint to lower left and right corner of room
+		coordinate = self._door['location']
+		coordinate_1 = coordinate[0]-2, coordinate[1]-1
+		coordinate_2 = coordinate[0]+1, coordinate[1]-1
+		self._navigator.add_waypoints([coordinate_1, coordinate_2])
+
+		# Open door
+		self._sendMessage('Arrived at door', state[self.agent_id]['obj_id'])
+		return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
+
+	def followPathToClosedDoor(self, state:State):
+		self._state_tracker.update(state)
+		# Follow path to door
+		action = self._navigator.get_move_action(self._state_tracker)
+		if action!=None:
+			return action, {}
+		else:
+			return -1
+
+	def planPathToClosedDoor(self, state:State):
+		self._navigator.reset_full()
+		closedDoors = [door for door in state.values()
+					   if 'class_inheritance' in door and 'Door' in door['class_inheritance'] and not door['is_open']]
+		if len(closedDoors)==0:
+			return None, {}
+		# Randomly pick a closed door
+		self._door = random.choice(closedDoors)
+		doorLoc = self._door['location']
+		# Location in front of door is south from door
+		doorLoc = doorLoc[0],doorLoc[1]+1
+		# Send message of current action
+		self._sendMessage('Moving to door of ' + self._door['room_name'], state[self.agent_id]['obj_id'])
+		self._navigator.add_waypoints([doorLoc])
+
 
 
 	# returns true if it found a goalBlock and the specified obj_id
 	def takeBlock(self):
-		for vBlock in self._visibleBlocks:
-			for gBlock in self._goalBlocks:
-				if (vBlock['visualization']['shape'] == gBlock['visualization']['shape']
-						and vBlock['visualization']['colour'] == gBlock['visualization']['colour']):
-					return True, vBlock, gBlock['location']
+		count = 0
+		for gBlock in self._goalBlocks:
+			gb = gBlock['visualization']
+			for vBlock in self._visibleBlocks:
+				vb = vBlock['visualization']
+				if (vb['shape'] == gb['shape']
+							and vb['colour'] == gb['colour']
+							and vb['size'] == gb['size']):
+					msg = 'Found goal block ' + self.visualize(vb) + ' at location ' + str(vBlock['location'])
+					self._sendMessage(msg, self._agentName)
+					if self._orderCounter == count:
+						print(count)
+						self._orderCounter += 1
+						return True, vBlock, gBlock['location']
+			count += 1
 		return False, None, None
 
+	def visualize(self, block):
+		res = '{"size": ' + str(block['size']) + ', "shape": ' + str(block['shape']) + ', "colour": "' + str(block['colour']) + '"}'
+		return res
 
 	def _sendMessage(self, mssg, sender):
 		'''
