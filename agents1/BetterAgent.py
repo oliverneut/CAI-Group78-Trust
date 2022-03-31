@@ -17,7 +17,8 @@ class Phase(enum.Enum):
 	OPEN_DOOR = 3,
 	SEARCH_ROOM = 4,
 	DROP_GOALBLOCK = 5,
-	REORDER_BLOCKS = 6
+	REORDER_BLOCKS = 6,
+	CHECK_DROP = 7
 
 
 class BetterAgent(BaseLineAgent):
@@ -40,7 +41,7 @@ class BetterAgent(BaseLineAgent):
 		self._doorsPrevious = None
 		self._amountOfMessages = {}
 		self._observations = {}
-		self._messages = {'found': [], 'picked up': [], 'dropped': []}
+		self._messages = {'found': [], 'picked up': [], 'dropped': [], 'self dropped': []}
 
 	def initialize(self):
 		super().initialize()
@@ -111,6 +112,36 @@ class BetterAgent(BaseLineAgent):
 			if Phase.DROP_GOALBLOCK == self._phase:
 				return self._dropGoalBlock(state)
 
+			if Phase.CHECK_DROP == self._phase:
+				self._navigator.add_waypoints([self._goalBlocks[1]['location']])
+				self._state_tracker.update(state)
+				action = self._navigator.get_move_action(self._state_tracker)
+				if action != None:
+					return action, {}
+				else:
+					droppedByMe = self._messages['self dropped'].copy()
+					for block in state.values():
+						if 'name' in block and 'Block in' in block['name']:
+							bVis = self._visualize(block['visualization']) + ' at ' + str(block['location'])
+							if bVis in droppedByMe:
+								droppedByMe.remove(bVis)
+								print(bVis + " was dropped by me")
+							else:
+								for supposedlyDropped in self._messages['dropped']:
+									if supposedlyDropped['block'] == bVis:
+										print(self._observations[supposedlyDropped['id']])
+										self._observations[supposedlyDropped['id']]['truths'] += 1
+										self._messages['dropped'].remove(supposedlyDropped)
+										print(bVis, "was INDEED DROPPED BY ", supposedlyDropped['id'])
+										print('new observations:', self._observations[supposedlyDropped['id']])
+
+					for message in self._messages['dropped']:
+						self._observations[message['id']]['lies'] += 1
+						print(message['id'], "LIED!!!")
+						print('new observations:', self._observations[message['id']])
+
+					print()
+					self._phase = Phase.DROP_GOALBLOCK
 
 	def _dropGoalBlock(self, state: State):
 		if not self._dropping:
@@ -127,6 +158,7 @@ class BetterAgent(BaseLineAgent):
 			self._dropping = False
 			msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at location ' + str(self._holdingBlock['location'])
 			self._sendMessage(msg, self._agentName)
+			self._messages['self dropped'].append( self._visualize(self._holdingBlock['visualization']) + ' at ' + str(self._goalBlocks[self._goalBlockFound]['location']))
 			return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
 
 	def _searchRoom(self, state: State):
@@ -139,7 +171,7 @@ class BetterAgent(BaseLineAgent):
 
 		blockDetected, vBlock = self._detectBlocks(state)
 		if blockDetected:
-			self._phase = Phase.DROP_GOALBLOCK
+			self._phase = Phase.CHECK_DROP
 			self._searching = False
 			msg = 'Picking up goal block ' + self._visualize(vBlock['visualization']) + ' at location ' + str(vBlock['location'])
 			self._sendMessage(msg, self._agentName)
@@ -194,6 +226,7 @@ class BetterAgent(BaseLineAgent):
 			return None, {}
 		# Randomly pick a closed door
 		self._door = random.choice(closedDoors)
+		# self._door = closedDoors[2]
 		doorLoc = self._door['location']
 		# Location in front of door is south from door
 		doorLoc = doorLoc[0], doorLoc[1]+1
@@ -256,15 +289,15 @@ class BetterAgent(BaseLineAgent):
 				if 'Found goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-4])
 					location = " ".join(message.split(" ")[-2:])
-					self._messages['found'].append({'id': member, 'visualization': visualization, 'location': location})
+					self._messages['found'].append({'id': member, 'block': visualization + " at " + location})
 				if 'Picking up goal block' in message:
 					visualization = " ".join(message.split(" ")[4:-3])
 					location = " ".join(message.split(" ")[-2:])
-					self._messages['picked up'].append({'id': member, 'visualization': visualization, 'location': location})
+					self._messages['picked up'].append({'id': member, 'block': visualization + " at " + location})
 				if 'Dropped goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-5])
 					location = " ".join(message.split(" ")[-2:])
-					self._messages['dropped'].append({'id': member, 'visualization': visualization, 'location': location})
+					self._messages['dropped'].append({'id': member, 'block': visualization + " at " + location})
 
 		self._amountOfMessages = {}
 		for member in received.keys():
