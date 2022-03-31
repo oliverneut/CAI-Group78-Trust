@@ -192,10 +192,11 @@ class LyingAgent(BaseLineAgent):
         self._navigator.add_waypoints([coordinate_1, coordinate_2])
 
         # Open door
-        if random.random() > 0.8:  # Tell the truth
-            self._sendMessage('Opening door of ' + self._door['room_name'], self._agentName)
-        else:  # Lie
-            self._sendMessage('Opening door of ' + self.randomRoom(state, self._door['room_name'])['room_name'], self._agentName)
+        if (not self._door['is_open']):
+            if random.random() > 0.8:  # Tell the truth
+                self._sendMessage('Opening door of ' + self._door['room_name'], self._agentName)
+            else:  # Lie
+                self._sendMessage('Opening door of ' + self.randomRoom(state, self._door['room_name'])['room_name'], self._agentName)
 
         return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
 

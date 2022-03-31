@@ -124,11 +124,12 @@ class BetterAgent(BaseLineAgent):
 			self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 			self._droppedBlocks[self._goalBlockFound] = 1
 			self._dropping = False
-			msg = 'Dropping goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at location ' + str(self._holdingBlock['location'])
+			msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at location ' + str(self._holdingBlock['location'])
 			self._sendMessage(msg, self._agentName)
 			return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
 
 	def _searchRoom(self, state: State):
+		self._sendMessage('Searching through ' + self._door['room_name'], self._agentName)
 		if not self._searching:
 			self._createPath(state)
 			self._searching = True
@@ -153,7 +154,7 @@ class BetterAgent(BaseLineAgent):
 				if not self._droppedBlocks[i]:
 					for v in self._visibleBlocks:
 						vb = v['visualization']
-						if gb['shape'] == vb['shape'] and gb['colour'] == vb['colour'] and gb['size'] == vb['size']:
+						if self._visualize(vb) == self._visualize(gb):
 							msg = 'Found goal block ' + self._visualize(vb) + ' at location ' + str(v['location'])
 							self._sendMessage(msg, self._agentName)
 							self._goalBlockFound = i
@@ -175,7 +176,8 @@ class BetterAgent(BaseLineAgent):
 		self._navigator.add_waypoints([coordinate_1, coordinate_2])
 
 	def _openDoor(self):
-		self._sendMessage('Opening door of ' + self._door['room_name'], self._agentName)
+		if (not self._door['is_open']):
+			self._sendMessage('Opening door of ' + self._door['room_name'], self._agentName)
 		return OpenDoorAction.__name__
 
 	def _followPathToClosedDoor(self, state: State):
@@ -195,7 +197,7 @@ class BetterAgent(BaseLineAgent):
 		# Location in front of door is south from door
 		doorLoc = doorLoc[0], doorLoc[1]+1
 		# Send message of current action
-		self._sendMessage('Moving to door of ' + self._door['room_name'], self._agentName)
+		self._sendMessage('Moving to ' + self._door['room_name'], self._agentName)
 		self._navigator.add_waypoints([doorLoc])
 
 	def _processMessages(self, teamMembers):
