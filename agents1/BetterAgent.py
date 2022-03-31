@@ -36,6 +36,8 @@ class BetterAgent(BaseLineAgent):
 		self._dropping = False
 		self._reordering = False
 		self._blockOrderIdx = 0
+		self._doors = None
+		self._amountOfMessages = {}
 
 	def initialize(self):
 		super().initialize()
@@ -64,6 +66,8 @@ class BetterAgent(BaseLineAgent):
 		# Process messages from team members
 		receivedMessages = self._processMessages(self._teamMembers)
 		# Update trust beliefs for team members
+		self._doors = [door for door in state.values() if 'class_inheritance' in door and 'Door' in door['class_inheritance']]
+
 		self._trustBelief(self._teamMembers, receivedMessages)
 
 		while True:
@@ -202,11 +206,37 @@ class BetterAgent(BaseLineAgent):
 		# You can change the default value to your preference
 		default = 0.5
 		trustBeliefs = {}
+
+		# Only parse the new messages
+		received_new = {}
 		for member in received.keys():
+			if member in self._amountOfMessages.keys():
+				received_new[member] = received[member][self._amountOfMessages[member]:]
+			else:
+				received_new[member] = received[member]
+
+		for member in received_new.keys():
 			trustBeliefs[member] = default
+		for member in received_new.keys():
+			for i, message in enumerate(received_new[member]):
+
+				# if 'Found' in message and 'colour' not in message:
+				# 	trustBeliefs[member]-=0.1
+				# 	break
+				if 'Opening door of' in message:
+					roomname = message.split(' ')[-1]
+					for door in self._doors:
+						if door['room_name'] == roomname:
+							if door['is_open']:
+								print("He is telling the truth about opening the door")
+								trustBeliefs[member] += 0.1
+							else:
+								print("He is lying about opening the door")
+								trustBeliefs[member] -= 0.1
+
+		# print(trustBeliefs)
+		self._amountOfMessages = {}
 		for member in received.keys():
-			for message in received[member]:
-				if 'Found' in message and 'colour' not in message:
-					trustBeliefs[member]-=0.1
-					break
+			self._amountOfMessages[member] = len(received[member])
+
 		return trustBeliefs

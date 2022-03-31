@@ -4,6 +4,7 @@ from agents1.BW4TBaselineAgent import BaseLineAgent
 from agents1.BW4TStrongAgent import StrongAgent
 from agents1.BW4TLyingAgent import LyingAgent
 from agents1.BW4TColorblindAgent import ColorBlindAgent
+from agents1.BetterAgent import BetterAgent
 from agents1.BW4THuman import Human
 # from agents1.LyingAgent import LyingAgent
 from agents1.Agent import Agent
@@ -18,10 +19,11 @@ if __name__ == "__main__":
     agents = [
         # {'name': 'strongagent', 'botclass': StrongAgent, 'settings': {}},
         # {'name': 'lyingagent', 'botclass': LyingAgent, 'settings': {}},
-        {'name': 'colorblindagent', 'botclass': ColorBlindAgent, 'settings': {}},
+        # {'name': 'colorblindagent', 'botclass': ColorBlindAgent, 'settings': {}},
+        {'name': 'betteragent', 'botclass': BetterAgent, 'settings': {}},
         # {'name':'agent1', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
         # {'name':'agent2', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
-        # {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {'slowdown': 3}},
+        {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},
         # {'name': 'ourAgent', 'botclass': Agent, 'settings': {}},
         #
         # {'name':'human', 'botclass':Human, 'settings':{}}
