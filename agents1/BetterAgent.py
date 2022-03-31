@@ -38,6 +38,7 @@ class BetterAgent(BaseLineAgent):
 		self._blockOrderIdx = 0
 		self._doors = None
 		self._amountOfMessages = {}
+		self._observations = {}
 
 	def initialize(self):
 		super().initialize()
@@ -207,9 +208,14 @@ class BetterAgent(BaseLineAgent):
 		default = 0.5
 		trustBeliefs = {}
 
-		# Only parse the new messages
+		# Initialize _observations
+		if self._observations == {}:
+			for member in received.keys():
+				self._observations[member] = {"truths": 1, "lies": 1}
+
 		received_new = {}
 		for member in received.keys():
+			# Only parse the new messages
 			if member in self._amountOfMessages.keys():
 				received_new[member] = received[member][self._amountOfMessages[member]:]
 			else:
@@ -228,15 +234,18 @@ class BetterAgent(BaseLineAgent):
 					for door in self._doors:
 						if door['room_name'] == roomname:
 							if door['is_open']:
-								print("He is telling the truth about opening the door")
-								trustBeliefs[member] += 0.1
+								self._observations[member]['truths'] += 1
+								print("truth")
+								# trustBeliefs[member] += 0.1
 							else:
-								print("He is lying about opening the door")
-								trustBeliefs[member] -= 0.1
+								self._observations[member]['lies'] += 1
+								print("lie")
+								# trustBeliefs[member] -= 0.1
 
-		# print(trustBeliefs)
 		self._amountOfMessages = {}
 		for member in received.keys():
 			self._amountOfMessages[member] = len(received[member])
+			trustBeliefs[member] = self._observations[member]['truths'] / (self._observations[member]['truths'] + self._observations[member]['lies'])
 
+		print(trustBeliefs)
 		return trustBeliefs
