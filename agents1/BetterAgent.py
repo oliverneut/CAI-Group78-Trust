@@ -252,7 +252,18 @@ class BetterAgent(BaseLineAgent):
 							else:
 								self._observations[member]['lies'] += 1
 								print("lie")
-
+				if 'Found goal block' in message:
+					visualization = " ".join(message.split(" ")[3:-4])
+					location = " ".join(message.split(" ")[-2:])
+					print(location)
+				if 'Picking up goal block' in message:
+					visualization = " ".join(message.split(" ")[4:-3])
+					location = " ".join(message.split(" ")[-2:])
+					print(location)
+				if 'Dropped goal block' in message:
+					visualization = " ".join(message.split(" ")[3:-5])
+					location = " ".join(message.split(" ")[-2:])
+					print(location)
 
 		self._amountOfMessages = {}
 		for member in received.keys():
