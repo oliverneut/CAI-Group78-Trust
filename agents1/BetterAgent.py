@@ -40,6 +40,7 @@ class BetterAgent(BaseLineAgent):
 		self._doorsPrevious = None
 		self._amountOfMessages = {}
 		self._observations = {}
+		self._messages = {'found': [], 'picked up': [], 'dropped': []}
 
 	def initialize(self):
 		super().initialize()
@@ -255,15 +256,15 @@ class BetterAgent(BaseLineAgent):
 				if 'Found goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-4])
 					location = " ".join(message.split(" ")[-2:])
-					print(location)
+					self._messages['found'].append({'id': member, 'visualization': visualization, 'location': location})
 				if 'Picking up goal block' in message:
 					visualization = " ".join(message.split(" ")[4:-3])
 					location = " ".join(message.split(" ")[-2:])
-					print(location)
+					self._messages['picked up'].append({'id': member, 'visualization': visualization, 'location': location})
 				if 'Dropped goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-5])
 					location = " ".join(message.split(" ")[-2:])
-					print(location)
+					self._messages['dropped'].append({'id': member, 'visualization': visualization, 'location': location})
 
 		self._amountOfMessages = {}
 		for member in received.keys():
