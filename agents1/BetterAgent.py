@@ -117,6 +117,7 @@ class BetterAgent(BaseLineAgent):
 				self._navigator.add_waypoints([self._goalBlocks[1]['location']])
 				self._state_tracker.update(state)
 				action = self._navigator.get_move_action(self._state_tracker)
+
 				if action != None:
 					return action, {}
 				else:
@@ -135,14 +136,17 @@ class BetterAgent(BaseLineAgent):
 										self._messages['dropped'].remove(supposedlyDropped)
 										print(bVis, "was INDEED DROPPED BY ", supposedlyDropped['id'])
 										self._sendMessage(supposedlyDropped['id'] + ' told the truth', self._agentName)
+										self._sendReputations()
 										print('new observations:', self._observations[supposedlyDropped['id']])
 
 					for message in self._messages['dropped']:
 						self._observations[message['id']]['lies'] += 1
 						print(message['id'], "LIED!!!")
 						self._sendMessage(message['id'] + ' has lied', self._agentName)
+						self._sendReputations()
 						print('new observations:', self._observations[message['id']])
 
+					self._messages['dropped'] = []
 					print()
 					self._phase = Phase.DROP_GOALBLOCK
 
@@ -228,8 +232,8 @@ class BetterAgent(BaseLineAgent):
 		if len(closedDoors) == 0:
 			return None, {}
 		# Randomly pick a closed door
-		# self._door = random.choice(closedDoors)
-		self._door = closedDoors[2]
+		self._door = random.choice(closedDoors)
+		# self._door = closedDoors[2]
 		doorLoc = self._door['location']
 		# Location in front of door is south from door
 		doorLoc = doorLoc[0], doorLoc[1]+1
@@ -249,6 +253,30 @@ class BetterAgent(BaseLineAgent):
 				if mssg.from_id == member:
 					receivedMessages[member].append(mssg.content)
 		return receivedMessages
+
+	def _sendReputations(self):
+		msg = "Reputations - "
+		for member in self._trustBeliefs.keys():
+			self._trustBeliefs[member] = self._observations[member]['truths'] / (
+						self._observations[member]['truths'] + self._observations[member]['lies'])
+
+			msg += str(member) + ": " + str(self._trustBeliefs[member]) + ", "
+		self._sendMessage(msg[:-2], self._agentName)
+
+	def _updateReputations(self, reputations, sender):
+		print('These are the reputations:', self._trustBeliefs)
+		print('Reputation of sender:', self._trustBeliefs[sender])
+		for reputation in reputations.split(", "):
+			print("reputation: ", reputation)
+			id = str(reputation.split(": ")[0])
+			if id == self._agentName:
+				continue
+			rep = float(reputation.split(": ")[1])
+			diff = rep - self._trustBeliefs[id]
+			self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 5.0
+		print('These are the new reputations:', self._trustBeliefs)
+
+
 
 	def _trustBelief(self, member, received):
 		'''
@@ -286,10 +314,12 @@ class BetterAgent(BaseLineAgent):
 							if self._doors[roomname]['is_open'] and not self._doorsPrevious[roomname]['is_open']:
 								self._observations[member]['truths'] += 1
 								self._sendMessage(member + ' told the truth', self._agentName)
+								self._sendReputations()
 								print("truth")
 							else:
 								self._observations[member]['lies'] += 1
 								self._sendMessage(member + ' has lied', self._agentName)
+								self._sendReputations()
 								print("lie")
 				if 'Found goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-4])
@@ -319,6 +349,8 @@ class BetterAgent(BaseLineAgent):
 					self._observations[aboutAgent]['lies'] += self._trustBeliefs[member]
 					print("after getting a lie, new observations: ", self._observations)
 					print()
+				if 'Reputation' in message:
+					self._updateReputations(message.split(" - ")[1], member)
 
 
 
