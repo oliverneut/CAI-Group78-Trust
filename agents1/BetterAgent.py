@@ -37,6 +37,7 @@ class BetterAgent(BaseLineAgent):
 		self._reordering = False
 		self._blockOrderIdx = 0
 		self._doors = None
+		self._doorsPrevious = None
 		self._amountOfMessages = {}
 		self._observations = {}
 
@@ -66,9 +67,19 @@ class BetterAgent(BaseLineAgent):
 				self._teamMembers.append(member)
 		# Process messages from team members
 		receivedMessages = self._processMessages(self._teamMembers)
-		# Update trust beliefs for team members
-		self._doors = [door for door in state.values() if 'class_inheritance' in door and 'Door' in door['class_inheritance']]
 
+		if self._doors != None:
+			self._doorsPrevious = self._doors.copy()
+
+		self._doors = {}
+		for door in state.values():
+			if 'class_inheritance' in door and 'Door' in door['class_inheritance']:
+				self._doors[door['room_name']] = door
+
+		if self._doorsPrevious == None:
+			self._doorsPrevious = self._doors.copy()
+
+		# Update trust beliefs for team members
 		self._trustBelief(self._teamMembers, receivedMessages)
 
 		while True:
@@ -231,21 +242,19 @@ class BetterAgent(BaseLineAgent):
 				# 	break
 				if 'Opening door of' in message:
 					roomname = message.split(' ')[-1]
-					for door in self._doors:
+					for door in self._doors.values():
 						if door['room_name'] == roomname:
-							if door['is_open']:
+							if self._doors[roomname]['is_open'] and not self._doorsPrevious[roomname]['is_open']:
 								self._observations[member]['truths'] += 1
 								print("truth")
-								# trustBeliefs[member] += 0.1
 							else:
 								self._observations[member]['lies'] += 1
 								print("lie")
-								# trustBeliefs[member] -= 0.1
+
 
 		self._amountOfMessages = {}
 		for member in received.keys():
 			self._amountOfMessages[member] = len(received[member])
 			trustBeliefs[member] = self._observations[member]['truths'] / (self._observations[member]['truths'] + self._observations[member]['lies'])
 
-		print(trustBeliefs)
 		return trustBeliefs
