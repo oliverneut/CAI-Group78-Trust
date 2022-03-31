@@ -127,27 +127,20 @@ class BetterAgent(BaseLineAgent):
 							bVis = self._visualize(block['visualization']) + ' at ' + str(block['location'])
 							if bVis in droppedByMe:
 								droppedByMe.remove(bVis)
-								print(bVis + " was dropped by me")
 							else:
 								for supposedlyDropped in self._messages['dropped']:
 									if supposedlyDropped['block'] == bVis:
-										print(self._observations[supposedlyDropped['id']])
 										self._observations[supposedlyDropped['id']]['truths'] += 1
 										self._messages['dropped'].remove(supposedlyDropped)
-										print(bVis, "was INDEED DROPPED BY ", supposedlyDropped['id'])
 										self._sendMessage(supposedlyDropped['id'] + ' told the truth', self._agentName)
 										self._sendReputations()
-										print('new observations:', self._observations[supposedlyDropped['id']])
 
 					for message in self._messages['dropped']:
 						self._observations[message['id']]['lies'] += 1
-						print(message['id'], "LIED!!!")
 						self._sendMessage(message['id'] + ' has lied', self._agentName)
 						self._sendReputations()
-						print('new observations:', self._observations[message['id']])
 
 					self._messages['dropped'] = []
-					print()
 					self._phase = Phase.DROP_GOALBLOCK
 
 	def _dropGoalBlock(self, state: State):
@@ -264,18 +257,13 @@ class BetterAgent(BaseLineAgent):
 		self._sendMessage(msg[:-2], self._agentName)
 
 	def _updateReputations(self, reputations, sender):
-		print('These are the reputations:', self._trustBeliefs)
-		print('Reputation of sender:', self._trustBeliefs[sender])
 		for reputation in reputations.split(", "):
-			print("reputation: ", reputation)
 			id = str(reputation.split(": ")[0])
 			if id == self._agentName:
 				continue
 			rep = float(reputation.split(": ")[1])
 			diff = rep - self._trustBeliefs[id]
 			self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 5.0
-		print('These are the new reputations:', self._trustBeliefs)
-
 
 
 	def _trustBelief(self, member, received):
@@ -315,12 +303,10 @@ class BetterAgent(BaseLineAgent):
 								self._observations[member]['truths'] += 1
 								self._sendMessage(member + ' told the truth', self._agentName)
 								self._sendReputations()
-								print("truth")
 							else:
 								self._observations[member]['lies'] += 1
 								self._sendMessage(member + ' has lied', self._agentName)
 								self._sendReputations()
-								print("lie")
 				if 'Found goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-4])
 					location = " ".join(message.split(" ")[-2:])
@@ -337,18 +323,12 @@ class BetterAgent(BaseLineAgent):
 					aboutAgent = message.split(" ")[0]
 					if aboutAgent == self._agentName:
 						continue
-					print("before the truth, old observations:", self._observations)
 					self._observations[aboutAgent]['truths'] += self._trustBeliefs[member]
-					print("after getting a truth, new observations: ", self._observations)
-					print()
 				if 'has lied' in message:
 					aboutAgent = message.split(" ")[0]
 					if aboutAgent == self._agentName:
 						continue
-					print("before the lie, old observations:", self._observations)
 					self._observations[aboutAgent]['lies'] += self._trustBeliefs[member]
-					print("after getting a lie, new observations: ", self._observations)
-					print()
 				if 'Reputation' in message:
 					self._updateReputations(message.split(" - ")[1], member)
 
