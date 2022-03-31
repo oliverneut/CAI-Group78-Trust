@@ -21,6 +21,8 @@ if __name__ == "__main__":
         # {'name': 'lyingagent', 'botclass': LyingAgent, 'settings': {}},
         # {'name': 'colorblindagent', 'botclass': ColorBlindAgent, 'settings': {}},
         {'name': 'betteragent', 'botclass': BetterAgent, 'settings': {}},
+        {'name': 'betteragent2', 'botclass': BetterAgent, 'settings': {}},
+        {'name': 'betteragent3', 'botclass': BetterAgent, 'settings': {}},
         # {'name':'agent1', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
         # {'name':'agent2', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
         {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},

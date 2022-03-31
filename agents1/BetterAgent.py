@@ -42,6 +42,7 @@ class BetterAgent(BaseLineAgent):
 		self._amountOfMessages = {}
 		self._observations = {}
 		self._messages = {'found': [], 'picked up': [], 'dropped': [], 'self dropped': []}
+		self._trustBeliefs = None
 
 	def initialize(self):
 		super().initialize()
@@ -133,11 +134,13 @@ class BetterAgent(BaseLineAgent):
 										self._observations[supposedlyDropped['id']]['truths'] += 1
 										self._messages['dropped'].remove(supposedlyDropped)
 										print(bVis, "was INDEED DROPPED BY ", supposedlyDropped['id'])
+										self._sendMessage(supposedlyDropped['id'] + ' told the truth', self._agentName)
 										print('new observations:', self._observations[supposedlyDropped['id']])
 
 					for message in self._messages['dropped']:
 						self._observations[message['id']]['lies'] += 1
 						print(message['id'], "LIED!!!")
+						self._sendMessage(message['id'] + ' has lied', self._agentName)
 						print('new observations:', self._observations[message['id']])
 
 					print()
@@ -225,8 +228,8 @@ class BetterAgent(BaseLineAgent):
 		if len(closedDoors) == 0:
 			return None, {}
 		# Randomly pick a closed door
-		self._door = random.choice(closedDoors)
-		# self._door = closedDoors[2]
+		# self._door = random.choice(closedDoors)
+		self._door = closedDoors[2]
 		doorLoc = self._door['location']
 		# Location in front of door is south from door
 		doorLoc = doorLoc[0], doorLoc[1]+1
@@ -282,9 +285,11 @@ class BetterAgent(BaseLineAgent):
 						if door['room_name'] == roomname:
 							if self._doors[roomname]['is_open'] and not self._doorsPrevious[roomname]['is_open']:
 								self._observations[member]['truths'] += 1
+								self._sendMessage(member + ' told the truth', self._agentName)
 								print("truth")
 							else:
 								self._observations[member]['lies'] += 1
+								self._sendMessage(member + ' has lied', self._agentName)
 								print("lie")
 				if 'Found goal block' in message:
 					visualization = " ".join(message.split(" ")[3:-4])
@@ -298,10 +303,29 @@ class BetterAgent(BaseLineAgent):
 					visualization = " ".join(message.split(" ")[3:-5])
 					location = " ".join(message.split(" ")[-2:])
 					self._messages['dropped'].append({'id': member, 'block': visualization + " at " + location})
+				if 'told the truth' in message:
+					aboutAgent = message.split(" ")[0]
+					if aboutAgent == self._agentName:
+						continue
+					print("before the truth, old observations:", self._observations)
+					self._observations[aboutAgent]['truths'] += self._trustBeliefs[member]
+					print("after getting a truth, new observations: ", self._observations)
+					print()
+				if 'has lied' in message:
+					aboutAgent = message.split(" ")[0]
+					if aboutAgent == self._agentName:
+						continue
+					print("before the lie, old observations:", self._observations)
+					self._observations[aboutAgent]['lies'] += self._trustBeliefs[member]
+					print("after getting a lie, new observations: ", self._observations)
+					print()
+
+
 
 		self._amountOfMessages = {}
 		for member in received.keys():
 			self._amountOfMessages[member] = len(received[member])
 			trustBeliefs[member] = self._observations[member]['truths'] / (self._observations[member]['truths'] + self._observations[member]['lies'])
+		self._trustBeliefs = trustBeliefs
 
 		return trustBeliefs
