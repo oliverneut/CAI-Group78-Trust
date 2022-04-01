@@ -79,6 +79,7 @@ class BaseLineAgent(BW4TBrain):
         '''
         msg = Message(content=mssg, from_id=sender)
         if msg.content not in self.received_messages:
+            print(str(sender) + ": " + mssg)
             self.send_message(msg)
 
     def _processMessages(self, teamMembers):
