@@ -92,8 +92,18 @@ class BaseAgent(BaseLineAgent):
 
         while True:
             if Phase.PLAN_PATH_TO_CLOSED_DOOR == self._phase:
+                # make a path to a door and announce that you are going there
                 self._planPathToCLosedDoor(state)
-                self._phase = Phase.FOLLOW_PATH_TO_CLOSED_DOOR
+
+                # non lazy agents go where they planned to go
+                if self._type is not 'lazy' or random.random() > 0.5:
+                    self._phase = Phase.FOLLOW_PATH_TO_CLOSED_DOOR
+
+                # lazy agents don't do what they say they would 50% of the time
+                else:
+                    self._navigator.reset_full()
+                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+
 
             if Phase.FOLLOW_PATH_TO_CLOSED_DOOR == self._phase:
                 action = self._followPathToClosedDoor(state)
@@ -103,17 +113,30 @@ class BaseAgent(BaseLineAgent):
                     self._phase = Phase.OPEN_DOOR
 
             if Phase.OPEN_DOOR == self._phase:
-                self._sendMessage('Opening door of ' + self._getRoom(self._door['room_name']), self._agentName)
-                self._phase = Phase.SEARCH_ROOM
-                return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
+                # if the door is not open yet, agent says that he's going to open it
+                if (not self._door['is_open']):
+                    self._sendMessage('Opening door of ' + self._getRoom(self._door['room_name']), self._agentName)
+
+                # non-lazy agents open the door after they say they will
+                if self._type is not 'lazy' or random.random() > 0.5:
+                    self._phase = Phase.SEARCH_ROOM
+                    return OpenDoorAction.__name__, {'object_id': self._door['obj_id']}
+
+                # lazy agents don't do what they say they would 50% of the time
+                else:
+                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.SEARCH_ROOM == self._phase:
+                # add waypoints for searching the room and announce that you're going to searce the room
                 res, params = self._searchRoom(state)
+
+                # search the room
                 if res != None:
                     return res, params
-                else:
-                    self._searching = False
-                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+
+                # once done, stop searching
+                self._searching = False
+                self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.DROP_GOALBLOCK == self._phase:
                 return self._dropGoalBlock(state)
@@ -218,20 +241,25 @@ class BaseAgent(BaseLineAgent):
     def _searchRoom(self, state: State):
         self._sendMessage('Searching through ' + self._getRoom(self._door['room_name']), self._agentName)
         if not self._searching:
-            self._createPath(state)
+            # the lazy agent does not search the room 50% of the time
+            if self._type is not 'lazy' or random.random() > 0.5:
+                self._createPath(state)
             self._searching = True
         self._state_tracker.update(state)
         action = self._navigator.get_move_action(self._state_tracker), {}
 
         blockDetected, vBlock = self._detectBlocks(state)
         if blockDetected:
-            self._phase = Phase.CHECK_DROP
-            self._searching = False
             msg = 'Picking up goal block ' + self._visualize(vBlock['visualization']) + ' at location ' + str(
                 vBlock['location'])
             self._sendMessage(msg, self._agentName)
-            self._holdingBlock = vBlock
-            action = GrabObject.__name__, {'object_id': vBlock['obj_id']}
+
+            # non-lazy agents pick up a block when they find it
+            if self._type is not 'lazy' or random.random() > 0.5:
+                self._holdingBlock = vBlock
+                action = GrabObject.__name__, {'object_id': vBlock['obj_id']}
+                self._phase = Phase.CHECK_DROP
+                self._searching = False
 
         return action
 
@@ -285,7 +313,6 @@ class BaseAgent(BaseLineAgent):
         # Lying agent returns a random door 80% of the time
         return random.choice(list(self._doors))
 
-
     def _accurateVisualization(self, block):
         """
 		This visualization is used by the agent to check whether two blocks are the same according to him/her
@@ -306,11 +333,6 @@ class BaseAgent(BaseLineAgent):
         coordinate_1 = coordinate[0] - 2, coordinate[1] - 1
         coordinate_2 = coordinate[0] + 1, coordinate[1] - 1
         self._navigator.add_waypoints([coordinate_1, coordinate_2])
-
-    def _openDoor(self):
-        if (not self._door['is_open']):
-            self._sendMessage('Opening door of ' + self._getRoom(self._door['room_name']), self._agentName)
-        return OpenDoorAction.__name__
 
     def _followPathToClosedDoor(self, state: State):
         self._state_tracker.update(state)
