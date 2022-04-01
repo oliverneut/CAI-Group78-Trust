@@ -10,7 +10,7 @@ from bw4t.statistics import Statistics
 # # from agents1.LyingAgent import LyingAgent
 # from agents1.Agent import Agent
 
-from agents1.Agents import NormalAgent, StrongAgent, LyingAgent, ColorblindAgent
+from agents1.Agents import NormalAgent, StrongAgent, LyingAgent, ColorblindAgent, LazyAgent
 
 
 
@@ -27,7 +27,8 @@ if __name__ == "__main__":
         # {'name':'agent1', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
         # {'name':'agent2', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
 
-        # {'name': 'strongagent', 'botclass': StrongAgent, 'settings': {}},
+        # {'name': 'strongAgent', 'botclass': StrongAgent, 'settings': {}},
+        # {'name': 'lazyAgent', 'botclass': LazyAgent, 'settings': {}},
         {'name': 'colorblindagent', 'botclass': ColorblindAgent, 'settings': {}},
         {'name': 'normalAgent', 'botclass': NormalAgent, 'settings': {}},
         {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},

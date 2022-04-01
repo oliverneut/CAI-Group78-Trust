@@ -437,3 +437,8 @@ class ColorblindAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
         super().__init__(settings)
         self._type = 'colorblind'
+
+class LazyAgent(BaseAgent):
+    def __init__(self, settings: Dict[str, object]):
+        super().__init__(settings)
+        self._type = 'lazy'
