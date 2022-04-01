@@ -35,7 +35,7 @@ class BaseAgent(BaseLineAgent):
         self._visibleBlocks = None
         self._droppedBlocks = [0, 0, 0]
         self._goalBlockFound = None
-        self._holdingBlock = None
+        self._holdingBlocks = []
         self._dropping = False
         self._reordering = False
         self._blockOrderIdx = 0
@@ -184,10 +184,10 @@ class BaseAgent(BaseLineAgent):
                             for gBlock in self._goalBlocks:
                                 if self._wrongBlockCondition(block, gBlock):
                                     print("wrong block in dropzone")
-                                    msg = 'Picking up goal block ' + self._visualize(block['visualization']) + ' at location ' + str(
-                                        block['location'])
-                                    self._sendMessage(msg, self._agentName)
-                                    self._holdingBlock = block
+                                    # msg = 'Picking up goal block ' + self._visualize(block['visualization']) + ' at location ' + str(
+                                    #     block['location'])
+                                    # self._sendMessage(msg, self._agentName)
+                                    self._holdingBlocks.append(block)
                                     action = GrabObject.__name__, {'object_id': block['obj_id']}
                                     self._phase = Phase.REMOVE_WRONG_BLOCK
                     if action !=None:
@@ -205,10 +205,10 @@ class BaseAgent(BaseLineAgent):
                     return action, {}
                 else:
                     self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
-                    msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(
-                        state.get_self()['location'])
-                    self._sendMessage(msg, self._agentName)
-                    return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+                    # msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(
+                    #     state.get_self()['location'])
+                    # self._sendMessage(msg, self._agentName)
+                    return DropObject.__name__, {'object_id': self._holdingBlocks.pop(0)['obj_id']}
 
     def _wrongBlockCondition(self, vb, gb):
         v = vb['visualization']
@@ -221,22 +221,30 @@ class BaseAgent(BaseLineAgent):
     def _dropGoalBlock(self, state: State):
         if not self._dropping:
             self._navigator.reset_full()
-            self._navigator.add_waypoints([self._goalBlocks[self._goalBlockFound]['location']])
+            # go to drop zone of the block that you're holding
+            self._navigator.add_waypoints([[gb for gb in self._goalBlocks if self._compareBlocks(gb['visualization'], self._holdingBlocks[0]['visualization'])][0]['location']])
         self._state_tracker.update(state)
         action = self._navigator.get_move_action(self._state_tracker)
 
         if action != None:
             return action, {}
         else:
-            self._phase = Phase.CHECK_WRONG_BLOCKS
-            self._droppedBlocks[self._goalBlockFound] = 1
-            self._dropping = False
-            msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(
+            msg = 'Dropped goal block ' + self._visualize(self._holdingBlocks[0]['visualization']) + ' at drop location ' + str(
                 self._goalBlocks[self._goalBlockFound]['location'])
             self._sendMessage(msg, self._agentName)
-            self._messages['self dropped'].append(self._accurateVisualization(self._holdingBlock['visualization']) + ' at ' + str(
+            self._messages['self dropped'].append(self._accurateVisualization(self._holdingBlocks[0]['visualization']) + ' at ' + str(
                 self._goalBlocks[self._goalBlockFound]['location']))
-            return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+            self._dropping = False
+
+            # if an agent carries one block
+            if len(self._holdingBlocks) == 1:
+                self._phase = Phase.CHECK_WRONG_BLOCKS
+
+            # if a strong agent carries two blocks
+            else:
+                self._phase = Phase.DROP_GOALBLOCK
+
+            return DropObject.__name__, {'object_id': self._holdingBlocks.pop(0)['obj_id']}
 
     def _searchRoom(self, state: State):
         self._sendMessage('Searching through ' + self._getRoom(self._door['room_name']), self._agentName)
@@ -253,34 +261,38 @@ class BaseAgent(BaseLineAgent):
             msg = 'Picking up goal block ' + self._visualize(vBlock['visualization']) + ' at location ' + str(
                 vBlock['location'])
             self._sendMessage(msg, self._agentName)
+            self._droppedBlocks[self._goalBlockFound] = 1
+
 
             # non-lazy agents pick up a block when they find it
             if self._type is not 'lazy' or random.random() > 0.5:
-                self._holdingBlock = vBlock
+                self._holdingBlocks.append(vBlock)
                 action = GrabObject.__name__, {'object_id': vBlock['obj_id']}
-                self._phase = Phase.CHECK_DROP
-                self._searching = False
+
+                # the strong agent may look for a second block
+                # weak agents deliver the block after they've found one
+                if self._type is not 'strong' or \
+                        len(self._holdingBlocks) > 1 or sum(self._droppedBlocks) == 3:
+                    self._phase = Phase.CHECK_DROP
+                    self._searching = False
+
 
         return action
 
     def _detectBlocks(self, state: State):
         for i in range(len(self._goalBlocks)):
             gb = self._goalBlocks[i]['visualization']
-            if i == self._blockOrderIdx:
-                if not self._droppedBlocks[i]:
-                    for v in self._visibleBlocks:
-                        vb = v['visualization']
-                        if self._accurateVisualization(vb) == self._accurateVisualization(gb):
-                            print(vb)
-                            msg = 'Found goal block ' + self._visualize(vb) + ' at location ' + str(v['location'])
-                            self._sendMessage(msg, self._agentName)
-                            self._goalBlockFound = i
-                            self._blockOrderIdx += 1
-                            return True, v
+            if not self._droppedBlocks[i]:
+                for v in self._visibleBlocks:
+                    vb = v['visualization']
+                    if self._compareBlocks(vb, gb):
+                        msg = 'Found goal block ' + self._visualize(vb) + ' at location ' + str(v['location'])
+                        self._sendMessage(msg, self._agentName)
+                        self._goalBlockFound = i
+                        return True, v
         return False, None
 
     def _visualize(self, block):
-        print(block)
         """
 		This method makes the visualization that the agent can use for the self._sendMessage() method
 		"""
@@ -325,6 +337,12 @@ class BaseAgent(BaseLineAgent):
         # Other agent can compare everything
         return '{"size": ' + str(block['size']) + ', "shape": ' + str(block['shape']) + ', "colour": "' + str(
             block['colour']) + '"}'
+
+    def _compareBlocks(self, a, b):
+        """
+        Returns whether two blocks have the same _accurateVisualization
+        """
+        return self._accurateVisualization(a) == self._accurateVisualization(b)
 
     def _createPath(self, state: State):
         self._navigator.reset_full()
