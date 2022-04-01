@@ -18,7 +18,10 @@ class Phase(enum.Enum):
     SEARCH_ROOM = 4,
     DROP_GOALBLOCK = 5,
     REORDER_BLOCKS = 6,
-    CHECK_DROP = 7
+    CHECK_DROP = 7,
+    CHECK_WRONG_BLOCKS = 8,
+    REMOVE_WRONG_BLOCK = 9
+
 
 class BaseAgent(BaseLineAgent):
 
@@ -145,6 +148,53 @@ class BaseAgent(BaseLineAgent):
                     self._messages['dropped'] = []
                     self._phase = Phase.DROP_GOALBLOCK
 
+            if Phase.CHECK_WRONG_BLOCKS == self._phase:
+                self._navigator.reset_full()
+                self._navigator.add_waypoints([self._goalBlocks[1]['location']])
+                self._state_tracker.update(state)
+                action = self._navigator.get_move_action(self._state_tracker)
+                if action != None:
+                    return action, {}
+                else:
+                    for block in state.values():
+                        if 'name' in block and 'Block in' in block['name']:
+                            for gBlock in self._goalBlocks:
+                                if self._wrongBlockCondition(block, gBlock):
+                                    print("wrong block in dropzone")
+                                    msg = 'Picking up goal block ' + self._visualize(block['visualization']) + ' at location ' + str(
+                                        block['location'])
+                                    self._sendMessage(msg, self._agentName)
+                                    self._holdingBlock = block
+                                    action = GrabObject.__name__, {'object_id': block['obj_id']}
+                                    self._phase = Phase.REMOVE_WRONG_BLOCK
+                    if action !=None:
+                        return action
+                    else:
+                        self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+
+            if Phase.REMOVE_WRONG_BLOCK == self._phase:
+                self._navigator.reset_full()
+                random_loc = self._goalBlocks[1]['location']
+                self._navigator.add_waypoints([(random_loc[0] - 5, random_loc[1])])
+                self._state_tracker.update(state)
+                action = self._navigator.get_move_action(self._state_tracker)
+                if action != None:
+                    return action, {}
+                else:
+                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+                    msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(
+                        state.get_self()['location'])
+                    self._sendMessage(msg, self._agentName)
+                    return DropObject.__name__, {'object_id': self._holdingBlock['obj_id']}
+
+    def _wrongBlockCondition(self, vb, gb):
+        v = vb['visualization']
+        g = gb['visualization']
+        if vb['location'] == gb['location'] and (self._accurateVisualization(v) != self._accurateVisualization(g)):
+            return True
+        else:
+            False
+
     def _dropGoalBlock(self, state: State):
         if not self._dropping:
             self._navigator.reset_full()
@@ -155,7 +205,7 @@ class BaseAgent(BaseLineAgent):
         if action != None:
             return action, {}
         else:
-            self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+            self._phase = Phase.CHECK_WRONG_BLOCKS
             self._droppedBlocks[self._goalBlockFound] = 1
             self._dropping = False
             msg = 'Dropped goal block ' + self._visualize(self._holdingBlock['visualization']) + ' at drop location ' + str(
