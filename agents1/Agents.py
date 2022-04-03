@@ -26,7 +26,7 @@ class Phase(enum.Enum):
 
 class BaseAgent(BaseLineAgent):
 
-    def __init__(self, settings: Dict[str, object], filename):
+    def __init__(self, settings: Dict[str, object]):
         super().__init__(settings)
         self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
         self._teamMembers = []
@@ -49,7 +49,7 @@ class BaseAgent(BaseLineAgent):
         self._supposedlyGotBlock = {'found': [[], [], []], 'picked up': [[], [], []], 'dropped': [[], [], []], 'rooms': {}}
         self._trustBeliefs = {}
         self._actionList = []
-        self._filename = filename
+        self._filename = None
 
     def initialize(self):
         super().initialize()
@@ -62,6 +62,11 @@ class BaseAgent(BaseLineAgent):
         if self._agentName == None:
             self._agentName = state[self.agent_id]['obj_id']
             self._trustBeliefs[self._agentName] = 1
+
+        # save the filename and read trust beliefs for the first time
+        if self._filename == None:
+            self._filename = "TB_" + self._agentName + ".csv"
+            self.readFile(self._filename)
 
         # save goalblocks at start
         if self._goalBlocks == None:
@@ -427,24 +432,19 @@ class BaseAgent(BaseLineAgent):
         # otherwise pick the one for which you trust the agents that searched it least
         else:
             minTrust = 1000000000
-            print()
-            print("______")
             for room in self._supposedlyGotBlock['rooms'].items():
                 roomTrust = 0
                 # go through everyone that visited a room
                 for attendee in room[1]:
                     # add how much you trust that agent to the roomTrust of the room
-                    roomTrust += self._trustBeliefs[attendee]
+                    if attendee == self._agentName:
+                        roomTrust += 1
+                    else:
+                        roomTrust += self._trustBeliefs[attendee]
 
                 if roomTrust < minTrust:
                     self._door = self._doors[room[0]]
                     minTrust = roomTrust
-
-            print("______")
-            print(minTrust)
-            print()
-
-
 
         doorLoc = self._door['location']
         # Location in front of door is south from door
@@ -600,6 +600,10 @@ class BaseAgent(BaseLineAgent):
         return self._trustBeliefs
 
     def readFile(self, fileName):
+        if not exists(self._filename):
+            with open(self._filename, "w"):
+                pass
+
         content = {}
         with open(fileName) as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
@@ -610,49 +614,26 @@ class BaseAgent(BaseLineAgent):
         self._trustBeliefs = content
 
 
-class NormalAgent(BaseAgent):
-    def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings, '')
-        self._type = 'normal'
-
 class StrongAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        self._filename = 'TB_strong.csv'
-        super().__init__(settings, self._filename)
+        super().__init__(settings)
         self._type = 'strong'
-        if not exists(self._filename):
-            with open(self._filename, "w"):
-                pass
-        super().readFile(self._filename)
+        # if not exists(self._filename):
+        #     with open(self._filename, "w"):
+        #         pass
 
 class LyingAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        self._filename = 'TB_liar.csv'
-        super().__init__(settings, self._filename)
+        super().__init__(settings)
         self._type = 'liar'
-        if not exists(self._filename):
-            with open(self._filename, "w"):
-                pass
-        super().readFile(self._filename)
 
 class ColorblindAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-
-        self._filename = 'TB_colorblind.csv'
-        super().__init__(settings, self._filename)
+        super().__init__(settings)
         self._type = 'colorblind'
-        if not exists(self._filename):
-            with open(self._filename, "w"):
-                pass
-        super().readFile(self._filename)
 
 class LazyAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        self._filename = 'TB_lazy.csv'
-        super().__init__(settings, self._filename)
+        super().__init__(settings)
         self._type = 'lazy'
-        if not exists(self._filename):
-            with open(self._filename, "w"):
-                pass
-        super().readFile(self._filename)
 

@@ -10,7 +10,7 @@ from bw4t.statistics import Statistics
 # # from agents1.LyingAgent import LyingAgent
 # from agents1.Agent import Agent
 
-from agents1.Agents import NormalAgent, StrongAgent, LyingAgent, ColorblindAgent, LazyAgent
+from agents1.Agents import StrongAgent, LyingAgent, ColorblindAgent, LazyAgent
 
 
 
