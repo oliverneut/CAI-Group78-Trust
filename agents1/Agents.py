@@ -203,10 +203,6 @@ class BaseAgent(BaseLineAgent):
                         if 'name' in block and 'Block in' in block['name']:
                             for gBlock in self._goalBlocks:
                                 if self._wrongBlockCondition(block, gBlock):
-                                    print("wrong block in dropzone")
-                                    # msg = 'Picking up goal block ' + self._visualize(block['visualization']) + ' at location ' + str(
-                                    #     block['location'])
-                                    # self._sendMessage(msg, self._agentName)
                                     self._holdingBlocks.append(block)
                                     action = GrabObject.__name__, {'object_id': block['obj_id']}
                                     self._phase = Phase.REMOVE_WRONG_BLOCK
@@ -616,7 +612,6 @@ class BaseAgent(BaseLineAgent):
                 # update self._observations based on saved data
                 self._observations[row[0]] = {'truths': float(row[1].split(', ')[0].split(': ')[1]),
                                               'lies': float(row[1].split(', ')[1].split(': ')[1][0:-1])}
-        print(self._observations)
         self._trustBeliefs = content
 
 
