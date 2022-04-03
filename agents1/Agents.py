@@ -514,7 +514,7 @@ class BaseAgent(BaseLineAgent):
 
         # save to file
         w = csv.writer(open(self._filename, "w", newline=''))
-        for key, val in self._trustBeliefs.items():
+        for key, val in self._observations.items():
             w.writerow([key, val])
 
 
@@ -613,9 +613,10 @@ class BaseAgent(BaseLineAgent):
         with open(fileName) as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for row in reader:
-                key = row[0]
-                val = row[1]
-                content[key] = val
+                # update self._observations based on saved data
+                self._observations[row[0]] = {'truths': float(row[1].split(', ')[0].split(': ')[1]),
+                                              'lies': float(row[1].split(', ')[1].split(': ')[1][0:-1])}
+        print(self._observations)
         self._trustBeliefs = content
 
 
