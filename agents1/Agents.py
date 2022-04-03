@@ -34,6 +34,7 @@ class BaseAgent(BaseLineAgent):
         self._goalBlocks = None
         self._visibleBlocks = None
         self._droppedBlocks = [0, 0, 0]
+        self._droppedBlocksObjIds = [0, 0, 0]
         self._goalBlockFound = None
         self._holdingBlocks = []
         self._dropping = False
@@ -46,6 +47,7 @@ class BaseAgent(BaseLineAgent):
         self._messages = {'found': [], 'picked up': [], 'dropped': [], 'self dropped': []}
         self._supposedlyGotBlock = {'found': [[], [], []], 'picked up': [[], [], []], 'dropped': [[], [], []], 'rooms': {}}
         self._trustBeliefs = {}
+        self._actionList = []
 
     def initialize(self):
         super().initialize()
@@ -204,7 +206,31 @@ class BaseAgent(BaseLineAgent):
                     if action !=None:
                         return action
                     else:
-                        self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+                        for block in state.values():
+                            if 'name' in block and 'Block in' in block['name']:
+                                for i in range(len(self._goalBlocks)):
+                                    gBlock = self._goalBlocks[i]
+                                    if block['location'] == gBlock['location']:
+                                        if self._compareBlocks(block['visualization'], gBlock['visualization']):
+                                            self._droppedBlocks[i] = 1
+                                            self._droppedBlocksObjIds[i] = block['obj_id']
+                        if sum(self._droppedBlocks) == 3:
+                            self._phase = Phase.REORDER_BLOCKS
+                        else:
+                            self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
+
+            if Phase.REORDER_BLOCKS == self._phase:
+                if not self._reordering:
+                    self._reordering = True
+                    self._actionList.append((MoveSouth.__name__, {}))
+                    for obj_id in self._droppedBlocksObjIds:
+                        self._actionList.append((GrabObject.__name__, {'object_id': obj_id}))
+                        self._actionList.append((DropObject.__name__, {'object_id': obj_id}))
+                        self._actionList.append((MoveNorth.__name__, {}))
+                if len(self._actionList) > 0:
+                    return self._actionList.pop(0)
+                else:
+                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.REMOVE_WRONG_BLOCK == self._phase:
                 self._navigator.reset_full()
