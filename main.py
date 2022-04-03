@@ -30,7 +30,6 @@ if __name__ == "__main__":
         {'name': 'strongAgent', 'botclass': StrongAgent, 'settings': {}},
         {'name': 'lazyAgent', 'botclass': LazyAgent, 'settings': {}},
         {'name': 'colorblindagent', 'botclass': ColorblindAgent, 'settings': {}},
-        {'name': 'normalAgent', 'botclass': NormalAgent, 'settings': {}},
         {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},
         {'name': 'lyingAgent2', 'botclass': LyingAgent, 'settings': {}},
         {'name': 'lyingAgent3', 'botclass': LyingAgent, 'settings': {}},

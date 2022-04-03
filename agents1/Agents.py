@@ -1,5 +1,5 @@
 from typing import final, List, Dict, Final
-import enum, random
+import enum, random, csv
 from bw4t.BW4TBrain import BW4TBrain
 from agents1.BW4TBaselineAgent import BaseLineAgent
 from matrx.agents.agent_utils.state import State
@@ -25,7 +25,7 @@ class Phase(enum.Enum):
 
 class BaseAgent(BaseLineAgent):
 
-    def __init__(self, settings: Dict[str, object]):
+    def __init__(self, settings: Dict[str, object], filename):
         super().__init__(settings)
         self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
         self._teamMembers = []
@@ -48,6 +48,7 @@ class BaseAgent(BaseLineAgent):
         self._supposedlyGotBlock = {'found': [[], [], []], 'picked up': [[], [], []], 'dropped': [[], [], []], 'rooms': {}}
         self._trustBeliefs = {}
         self._actionList = []
+        self._filename = filename
 
     def initialize(self):
         super().initialize()
@@ -502,6 +503,11 @@ class BaseAgent(BaseLineAgent):
             diff = rep - self._trustBeliefs[id]
             self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 5.0
 
+        w = csv.writer(open(self._filename, "w"))
+        for key, val in self._trustBeliefs.items():
+            w.writerow([key, val])
+
+
     def _sendIndirectObservation(self, agentId, isTrue: bool):
         # Liar agent lies 80% of the time
         if self._type == 'liar' and random.random() < 0.8:
@@ -592,28 +598,43 @@ class BaseAgent(BaseLineAgent):
 
         return self._trustBeliefs
 
+    def readFile(self, fileName):
+        content = {}
+        with open(fileName) as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            for row in reader:
+                key = row[0]
+                val = row[1]
+                content[key] = val
+        self._trustBeliefs = content
+
 
 class NormalAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings)
+        super().__init__(settings, '')
         self._type = 'normal'
 
 class StrongAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings)
+        super().__init__(settings, 'TB_strong.csv')
         self._type = 'strong'
+        super().readFile('TB_strong.csv')
 
 class LyingAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings)
+        super().__init__(settings, 'TB_liar.csv')
         self._type = 'liar'
+        super().readFile('TB_liar.csv')
 
 class ColorblindAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings)
+        super().__init__(settings, 'TB_colorblind.csv')
         self._type = 'colorblind'
+        super().readFile('TB_colorblind.csv')
 
 class LazyAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings)
+        super().__init__(settings, 'TB_lazy.csv')
         self._type = 'lazy'
+        super().readFile('TB_lazy.csv')
+
