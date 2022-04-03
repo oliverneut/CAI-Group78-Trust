@@ -46,7 +46,8 @@ class BaseAgent(BaseLineAgent):
         self._amountOfMessages = {}
         self._observations = {}
         self._messages = {'found': [], 'picked up': [], 'dropped': [], 'self dropped': []}
-        self._trustBeliefs = None
+        self._supposedlyGotBlock = {'found': [[], [], []], 'picked up': [[], [], []], 'dropped': [[], [], []], 'rooms': {}}
+        self._trustBeliefs = {}
         self._actionList = []
         self._filename = filename
 
@@ -57,16 +58,26 @@ class BaseAgent(BaseLineAgent):
                                     action_set=self.action_set, algorithm=Navigator.A_STAR_ALGORITHM)
 
     def filter_observations(self, state: State) -> State:
+        # save agent name at start
         if self._agentName == None:
             self._agentName = state[self.agent_id]['obj_id']
+            self._trustBeliefs[self._agentName] = 1
 
+        # save goalblocks at start
         if self._goalBlocks == None:
             self._goalBlocks = [item for item in state.values() if
                                 ('name' in item.keys() and item['name'] == 'Collect Block')]
+
+        # save doors at start
         if self._doors == None:
             self._doors = [door for door in state.values() if
                            'class_inheritance' in door and 'Door' in door['class_inheritance']]
 
+            # save the room names as keys in self._supposedlyGotBlock['rooms]
+            for door in self._doors:
+                self._supposedlyGotBlock['rooms'][door['room_name']] = []
+
+        # every tick filter out which blocks the agent sees
         self._visibleBlocks = [item for item in state.values() if
                                'class_inheritance' in item and 'CollectableBlock' in item['class_inheritance']]
 
@@ -221,7 +232,7 @@ class BaseAgent(BaseLineAgent):
                 if len(self._actionList) > 0:
                     return self._actionList.pop(0)
                 else:
-                    print("NOT SURE WHAT IS WRONG AT THIS POINT")
+                    self._phase = Phase.PLAN_PATH_TO_CLOSED_DOOR
 
             if Phase.REMOVE_WRONG_BLOCK == self._phase:
                 self._navigator.reset_full()
@@ -275,7 +286,11 @@ class BaseAgent(BaseLineAgent):
             return DropObject.__name__, {'object_id': self._holdingBlocks.pop(0)['obj_id']}
 
     def _searchRoom(self, state: State):
+        # say that you are going to search the room
         self._sendMessage('Searching through ' + self._getRoom(self._door['room_name']), self._agentName)
+        # add yourself to list of agents that have seached this room
+        self._supposedlyGotBlock['rooms'][self._door['room_name']].append(self._agentName)
+
         if not self._searching:
             # the lazy agent does not search the room 50% of the time
             if self._type is not 'lazy' or random.random() > 0.5:
@@ -291,21 +306,35 @@ class BaseAgent(BaseLineAgent):
             self._sendMessage(msg, self._agentName)
             self._droppedBlocks[self._goalBlockFound] = 1
 
+            # check trust of agents that said that they've picked this block up already
+            totalTrust = 0
+            for agent in self._supposedlyGotBlock['picked up'][self._indexOfGoalblock(vBlock['visualization'])]:
+                totalTrust += self._trustBeliefs[agent]
 
-            # non-lazy agents pick up a block when they find it
-            if self._type is not 'lazy' or random.random() > 0.5:
-                self._holdingBlocks.append(vBlock)
-                action = GrabObject.__name__, {'object_id': vBlock['obj_id']}
-
-                # the strong agent may look for a second block
-                # weak agents deliver the block after they've found one
-                if self._type is not 'strong' or \
-                        len(self._holdingBlocks) > 1 or sum(self._droppedBlocks) == 3:
-                    self._phase = Phase.CHECK_DROP
-                    self._searching = False
+            # if nobody else picked up the block, or you don't trust them enough, pick up the block
+            if totalTrust < 0.75:
+                # non-lazy agents pick up a block when they find it
+                if self._type is not 'lazy' or random.random() > 0.5:
+                    self._holdingBlocks.append(vBlock)
+                    action = GrabObject.__name__, {'object_id': vBlock['obj_id']}
+                    # the strong agent may look for a second block
+                    # weak agents deliver the block after they've found one
+                    if self._type is not 'strong' or \
+                            len(self._holdingBlocks) > 1 or sum(self._droppedBlocks) == 3:
+                        self._phase = Phase.CHECK_DROP
+                        self._searching = False
 
 
         return action
+
+    def _indexOfGoalblock(self, block):
+        """
+        This method returns the index of the goalblock that has the same visualization as the input block
+        """
+        for i, gb in enumerate(self._goalBlocks):
+            if self._compareBlocks(block, gb['visualization']):
+                return i
+        return None
 
     def _detectBlocks(self, state: State):
         for i in range(len(self._goalBlocks)):
@@ -390,11 +419,33 @@ class BaseAgent(BaseLineAgent):
         self._navigator.reset_full()
         closedDoors = [door for door in state.values() if
                        'class_inheritance' in door and 'Door' in door['class_inheritance'] and not door['is_open']]
-        if len(closedDoors) == 0:
-            return None, {}
-        # Randomly pick a closed door
-        self._door = random.choice(closedDoors)
-        # self._door = closedDoors[2]
+
+        # if threre are unopened doors, pick one randomly
+        if len(closedDoors) > 0:
+            self._door = random.choice(closedDoors)
+
+        # otherwise pick the one for which you trust the agents that searched it least
+        else:
+            minTrust = 1000000000
+            print()
+            print("______")
+            for room in self._supposedlyGotBlock['rooms'].items():
+                roomTrust = 0
+                # go through everyone that visited a room
+                for attendee in room[1]:
+                    # add how much you trust that agent to the roomTrust of the room
+                    roomTrust += self._trustBeliefs[attendee]
+
+                if roomTrust < minTrust:
+                    self._door = self._doors[room[0]]
+                    minTrust = roomTrust
+
+            print("______")
+            print(minTrust)
+            print()
+
+
+
         doorLoc = self._door['location']
         # Location in front of door is south from door
         doorLoc = doorLoc[0], doorLoc[1] + 1
@@ -420,6 +471,8 @@ class BaseAgent(BaseLineAgent):
 
         if self._type is not 'liar' or random.random() > 0.8:
             for member in self._trustBeliefs.keys():
+                if member == self._agentName:
+                    continue
                 # update trustBeliefs for each member
                 self._trustBeliefs[member] = self._observations[member]['truths'] / (
                         self._observations[member]['truths'] + self._observations[member]['lies'])
@@ -430,6 +483,8 @@ class BaseAgent(BaseLineAgent):
         # Lying agent just makes up random numbers
         else:
             for member in self._trustBeliefs.keys():
+                if member == self._agentName:
+                    continue
                 # update trustBeliefs for each member
                 self._trustBeliefs[member] = self._observations[member]['truths'] / (
                         self._observations[member]['truths'] + self._observations[member]['lies'])
@@ -447,9 +502,9 @@ class BaseAgent(BaseLineAgent):
                 continue
             rep = float(reputation.split(": ")[1])
             diff = rep - self._trustBeliefs[id]
-            self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 5.0
+            self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 10.0
 
-        w = csv.writer(open(self._filename, "w"))
+        w = csv.writer(open(self._filename, "w", newline=''))
         for key, val in self._trustBeliefs.items():
             w.writerow([key, val])
 
@@ -469,9 +524,6 @@ class BaseAgent(BaseLineAgent):
         '''
 		Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
 		'''
-        # You can change the default value to your preference
-        default = 0.5
-        trustBeliefs = {}
 
         # Initialize _observations
         if self._observations == {}:
@@ -486,9 +538,6 @@ class BaseAgent(BaseLineAgent):
             else:
                 received_new[member] = received[member]
 
-        if len(trustBeliefs) == 0:
-            for member in received_new.keys():
-                trustBeliefs[member] = default
         for member in received_new.keys():
             for i, message in enumerate(received_new[member]):
 
@@ -507,14 +556,24 @@ class BaseAgent(BaseLineAgent):
                                 self._observations[member]['lies'] += 1
                                 self._sendIndirectObservation(member, False)
                                 self._sendReputations()
+                if 'Searching through ' in message:
+                    roomName = message.split(" ")[-1]
+                    self._supposedlyGotBlock['rooms'][roomName].append(member)
                 if 'Found goal block' in message:
                     visualization = " ".join(message.split(" ")[3:-4])
                     location = " ".join(message.split(" ")[-2:])
                     self._messages['found'].append({'id': member, 'block': visualization + " at " + location})
                 if 'Picking up goal block' in message:
-                    visualization = " ".join(message.split(" ")[4:-3])
+                    visualization = " ".join(message.split(" ")[4:-4])
                     location = " ".join(message.split(" ")[-2:])
                     self._messages['picked up'].append({'id': member, 'block': visualization + " at " + location})
+
+                    # save who reported picking up which blocks
+                    for i, gb in enumerate(self._goalBlocks):
+                        if visualization == self._accurateVisualization(gb['visualization']):
+                            if member not in self._supposedlyGotBlock['picked up'][i]:
+                                self._supposedlyGotBlock['picked up'][i].append(member)
+
                 if 'Dropped goal block' in message:
                     visualization = " ".join(message.split(" ")[3:-5])
                     location = " ".join(message.split(" ")[-2:])
@@ -535,11 +594,10 @@ class BaseAgent(BaseLineAgent):
         self._amountOfMessages = {}
         for member in received.keys():
             self._amountOfMessages[member] = len(received[member])
-            trustBeliefs[member] = self._observations[member]['truths'] / (
+            self._trustBeliefs[member] = self._observations[member]['truths'] / (
                     self._observations[member]['truths'] + self._observations[member]['lies'])
-        self._trustBeliefs = trustBeliefs
 
-        return trustBeliefs
+        return self._trustBeliefs
 
     def readFile(self, fileName):
         content = {}
