@@ -1,5 +1,6 @@
 from typing import final, List, Dict, Final
 import enum, random, csv
+from os.path import exists
 from bw4t.BW4TBrain import BW4TBrain
 from agents1.BW4TBaselineAgent import BaseLineAgent
 from matrx.agents.agent_utils.state import State
@@ -558,25 +559,42 @@ class NormalAgent(BaseAgent):
 
 class StrongAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings, 'TB_strong.csv')
+        self._filename = 'TB_strong.csv'
+        super().__init__(settings, self._filename)
         self._type = 'strong'
-        super().readFile('TB_strong.csv')
+        if not exists(self._filename):
+            with open(self._filename, "w"):
+                pass
+        super().readFile(self._filename)
 
 class LyingAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings, 'TB_liar.csv')
+        self._filename = 'TB_liar.csv'
+        super().__init__(settings, self._filename)
         self._type = 'liar'
-        super().readFile('TB_liar.csv')
+        if not exists(self._filename):
+            with open(self._filename, "w"):
+                pass
+        super().readFile(self._filename)
 
 class ColorblindAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings, 'TB_colorblind.csv')
+
+        self._filename = 'TB_colorblind.csv'
+        super().__init__(settings, self._filename)
         self._type = 'colorblind'
-        super().readFile('TB_colorblind.csv')
+        if not exists(self._filename):
+            with open(self._filename, "w"):
+                pass
+        super().readFile(self._filename)
 
 class LazyAgent(BaseAgent):
     def __init__(self, settings: Dict[str, object]):
-        super().__init__(settings, 'TB_lazy.csv')
+        self._filename = 'TB_lazy.csv'
+        super().__init__(settings, self._filename)
         self._type = 'lazy'
-        super().readFile('TB_lazy.csv')
+        if not exists(self._filename):
+            with open(self._filename, "w"):
+                pass
+        super().readFile(self._filename)
 
