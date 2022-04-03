@@ -500,10 +500,19 @@ class BaseAgent(BaseLineAgent):
             id = str(reputation.split(": ")[0])
             if id == self._agentName:
                 continue
-            rep = float(reputation.split(": ")[1])
-            diff = rep - self._trustBeliefs[id]
-            self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 10.0
+            reputation = float(reputation.split(": ")[1])
 
+            # update the trust value based on the reputation of the agent and the sender
+            self._observations[id]['truths'] += reputation * self._trustBeliefs[sender] / len(self._observations.keys())
+            self._observations[id]['lies'] += (1.0 - reputation) * self._trustBeliefs[sender] / len(self._observations.keys())
+            # the change is also divided by the amount of agents in the round, to avoid swings that are too big
+
+        # update the reputations
+        for member in self._observations.keys():
+            self._trustBeliefs[member] = self._observations[member]['truths'] / (
+                    self._observations[member]['truths'] + self._observations[member]['lies'])
+
+        # save to file
         w = csv.writer(open(self._filename, "w", newline=''))
         for key, val in self._trustBeliefs.items():
             w.writerow([key, val])
@@ -522,7 +531,7 @@ class BaseAgent(BaseLineAgent):
 
     def _trustBelief(self, member, received):
         '''
-		Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
+          Reads and processes all of the messages of the last tick. Saves information or calls methods if necessary.
 		'''
 
         # Initialize _observations
@@ -540,10 +549,6 @@ class BaseAgent(BaseLineAgent):
 
         for member in received_new.keys():
             for i, message in enumerate(received_new[member]):
-
-                # if 'Found' in message and 'colour' not in message:
-                # 	trustBeliefs[member]-=0.1
-                # 	break
                 if 'Opening door of' in message:
                     roomname = message.split(' ')[-1]
                     for door in self._doors.values():
