@@ -28,11 +28,15 @@ if __name__ == "__main__":
         # {'name':'agent2', 'botclass':BaseLineAgent, 'settings':{'slowdown':10}},
 
         {'name': 'strongAgent', 'botclass': StrongAgent, 'settings': {}},
-        # {'name': 'lazyAgent', 'botclass': LazyAgent, 'settings': {}},
-        # {'name': 'colorblindagent', 'botclass': ColorblindAgent, 'settings': {}},
-        # {'name': 'normalAgent', 'botclass': NormalAgent, 'settings': {}},
-        # {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},
-        #
+        {'name': 'lazyAgent', 'botclass': LazyAgent, 'settings': {}},
+        {'name': 'colorblindagent', 'botclass': ColorblindAgent, 'settings': {}},
+        {'name': 'normalAgent', 'botclass': NormalAgent, 'settings': {}},
+        {'name': 'lyingAgent1', 'botclass': LyingAgent, 'settings': {}},
+        {'name': 'lyingAgent2', 'botclass': LyingAgent, 'settings': {}},
+        {'name': 'lyingAgent3', 'botclass': LyingAgent, 'settings': {}},
+        {'name': 'lyingAgent4', 'botclass': LyingAgent, 'settings': {}},
+        {'name': 'lyingAgent5', 'botclass': LyingAgent, 'settings': {}},
+
         # {'name':'human', 'botclass':Human, 'settings':{}}
         ]
 
