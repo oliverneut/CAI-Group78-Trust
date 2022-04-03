@@ -501,9 +501,9 @@ class BaseAgent(BaseLineAgent):
                 continue
             rep = float(reputation.split(": ")[1])
             diff = rep - self._trustBeliefs[id]
-            self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 5.0
+            self._trustBeliefs[id] += diff * self._trustBeliefs[sender] / 10.0
 
-        w = csv.writer(open(self._filename, "w"))
+        w = csv.writer(open(self._filename, "w", newline=''))
         for key, val in self._trustBeliefs.items():
             w.writerow([key, val])
 
